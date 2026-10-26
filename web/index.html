@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#120d08" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Το Μαγικό Άλμπουμ του Θείου Αλβέρτου — Browser Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-deep: #0b0805;
+      --bg-leather: #1a120b;
+      --gold-primary: #d9a74a;
+      --gold-bright: #f4cf7b;
+      --parchment: #f3e8d2;
+      --parchment-dim: #b5a485;
+      --accent-amber: #e07a2e;
+      --glass-bg: rgba(24, 17, 11, 0.84);
+      --glass-border: rgba(217, 167, 74, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #23180e 0%, #0e0a06 68%, #050402 100%);
+      color: var(--parchment);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      touch-action: none;
+    }
+
+    /* Top bar */
+    header {
+      height: 48px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border);
+      z-index: 30;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #b88028, #6b4210);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      box-shadow: 0 2px 8px rgba(217, 167, 74, 0.35);
+      border: 1px solid rgba(244, 207, 123, 0.45);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.96rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: var(--gold-bright);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-subtitle {
+      font-size: 0.72rem;
+      color: var(--parchment-dim);
+      padding-left: 8px;
+      border-left: 1px solid rgba(217, 167, 74, 0.25);
+      white-space: nowrap;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      background: rgba(255, 248, 231, 0.06);
+      color: var(--parchment);
+      border: 1px solid rgba(217, 167, 74, 0.28);
+      padding: 6px 11px;
+      border-radius: 7px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.16s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: rgba(217, 167, 74, 0.18);
+      border-color: var(--gold-primary);
+      color: #fff;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn.active {
+      background: linear-gradient(135deg, rgba(217, 167, 74, 0.34), rgba(180, 110, 30, 0.34));
+      border-color: var(--gold-bright);
+      color: var(--gold-bright);
+      box-shadow: 0 0 12px rgba(217, 167, 74, 0.35);
+    }
+
+    /* Main stage */
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 10px;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .viewport-frame {
+      position: relative;
+      width: min(100%, calc((100dvh - 88px) * (4 / 3)));
+      aspect-ratio: 4 / 3;
+      max-height: 100%;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.92),
+        0 0 0 1px rgba(217, 167, 74, 0.3),
+        0 0 36px rgba(217, 167, 74, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+
+    canvas#canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      outline: none;
+      touch-action: none;
+      cursor: none;
+    }
+
+    /* Virtual Trackpad Cursor Overlay */
+    #trackpad-cursor {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+      z-index: 22;
+      transform: translate(-2px, -2px);
+      opacity: 0;
+      transition: opacity 0.18s ease, filter 0.12s ease;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85));
+    }
+
+    #trackpad-cursor.visible {
+      opacity: 0.92;
+    }
+
+    #trackpad-cursor.dragging {
+      filter: drop-shadow(0 0 6px rgba(244, 207, 123, 0.95)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9));
+    }
+
+    #trackpad-cursor .cursor-ring {
+      position: absolute;
+      left: -6px;
+      top: -6px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(244, 207, 123, 0);
+      transition: all 0.14s ease;
+    }
+
+    #trackpad-cursor.dragging .cursor-ring {
+      border-color: rgba(244, 207, 123, 0.95);
+      background: rgba(244, 207, 123, 0.22);
+      transform: scale(1.25);
+    }
+
+    /* Floating Touch Action Dock (for Drag Lock & Quick Keyboard on Touchscreens) */
+    #touch-dock {
+      position: fixed;
+      right: max(12px, env(safe-area-inset-right, 12px));
+      bottom: max(14px, env(safe-area-inset-bottom, 14px));
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 34;
+    }
+
+    .dock-btn {
+      min-width: 48px;
+      height: 46px;
+      padding: 0 12px;
+      border-radius: 23px;
+      background: rgba(24, 17, 11, 0.86);
+      border: 1.5px solid rgba(217, 167, 74, 0.45);
+      color: var(--parchment);
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .dock-btn.active {
+      background: linear-gradient(135deg, #d9a74a, #9e6818);
+      color: #120b04;
+      border-color: #fff3d1;
+      box-shadow: 0 0 18px rgba(244, 207, 123, 0.65);
+    }
+
+    /* Loading overlay */
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(28, 20, 12, 0.94) 0%, rgba(10, 7, 4, 0.98) 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 25;
+      transition: opacity 0.45s ease, visibility 0.45s ease;
+      padding: 24px;
+      text-align: center;
+    }
+
+    #loading-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    . crest {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, rgba(217, 167, 74, 0.28), rgba(107, 66, 16, 0.1));
+      border: 2px solid rgba(217, 167, 74, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 18px;
+      box-shadow: 0 0 28px rgba(217, 167, 74, 0.25);
+      animation: pulse 2.4s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 22px rgba(217, 167, 74, 0.22); }
+      50% { transform: scale(1.06); box-shadow: 0 0 36px rgba(244, 207, 123, 0.42); }
+    }
+
+    .loading-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.3rem;
+      color: var(--gold-bright);
+      margin-bottom: 6px;
+    }
+
+    #status-text {
+      font-size: 0.88rem;
+      color: var(--parchment-dim);
+      margin-bottom: 18px;
+      min-height: 1.3em;
+    }
+
+    .progress-track {
+      width: min(300px, 78vw);
+      height: 7px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 99px;
+      overflow: hidden;
+      border: 1px solid rgba(217, 167, 74, 0.25);
+    }
+
+    #progress-bar {
+      width: 8%;
+      height: 100%;
+      background: linear-gradient(90deg, #9e6818, var(--gold-primary), var(--gold-bright));
+      border-radius: 99px;
+      transition: width 0.22s ease;
+    }
+
+    /* On-screen Greek & Latin Keyboard Input Bar */
+    #mobile-kb-bar {
+      display: none;
+      position: fixed;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(560px, 95vw);
+      background: rgba(22, 15, 9, 0.96);
+      border: 1.5px solid var(--gold-primary);
+      border-radius: 10px;
+      padding: 7px 9px;
+      z-index: 45;
+      gap: 6px;
+      align-items: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+    }
+
+    #mobile-kb-bar.open {
+      display: flex;
+    }
+
+    #mobile-kb-input {
+      flex: 1;
+      min-width: 0;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(217, 167, 74, 0.45);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 16px; /* >=16px prevents iOS zoom on focus */
+      padding: 6px 10px;
+      outline: none;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    #mobile-kb-input::placeholder {
+      color: rgba(243, 232, 210, 0.5);
+      font-size: 0.82rem;
+    }
+
+    .kb-key-btn {
+      background: rgba(217, 167, 74, 0.18);
+      color: var(--gold-bright);
+      border: 1px solid rgba(217, 167, 74, 0.4);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .kb-key-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Footer */
+    footer {
+      height: 28px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--parchment-dim);
+      background: rgba(8, 5, 3, 0.78);
+      border-top: 1px solid rgba(217, 167, 74, 0.14);
+      z-index: 20;
+      flex-shrink: 0;
+    }
+
+    .kbd-hint kbd {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: inherit;
+      font-size: 0.68rem;
+      color: var(--parchment);
+    }
+
+    /* Help Modal */
+    #help-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      padding: 16px;
+    }
+
+    #help-modal.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: linear-gradient(165deg, #21170e, #120c07);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      max-width: 500px;
+      width: 100%;
+      padding: 22px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.92);
+    }
+
+    .modal-card h2 {
+      font-family: 'Cinzel', serif;
+      color: var(--gold-bright);
+      font-size: 1.12rem;
+      margin-bottom: 12px;
+    }
+
+    .modal-card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      font-size: 0.84rem;
+      line-height: 1.45;
+      color: var(--parchment);
+      margin-bottom: 18px;
+    }
+
+    .modal-card li strong {
+      color: var(--gold-primary);
+    }
+
+    @media (max-width: 760px) {
+      .brand-subtitle, footer { display: none; }
+      header { height: 42px; padding: 0 8px; }
+      .brand-title { font-size: 0.82rem; }
+      .btn span.label-text { display: none; }
+      .btn { padding: 6px 9px; }
+      main { padding: 2px; }
+      .viewport-frame {
+        width: min(100vw, calc((100dvh - 44px) * (4 / 3)));
+        border-radius: 4px;
+      }
+      #mobile-kb-bar { top: 44px; }
+    }
+
+    @media (max-height: 500px) and (orientation: landscape) {
+      .brand-subtitle, footer { display: none; }
+      header { height: 34px; padding: 0 8px; }
+      .brand-badge { width: 22px; height: 22px; font-size: 12px; }
+      .brand-title { font-size: 0.78rem; }
+      .btn { padding: 3px 8px; font-size: 0.72rem; }
+      main { padding: 0; }
+      .viewport-frame {
+        height: calc(100dvh - 34px);
+        width: calc((100dvh - 34px) * (4 / 3));
+        max-width: 100vw;
+        border-radius: 0;
+      }
+      #mobile-kb-bar { top: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-badge">📖</div>
+      <div class="brand-title">Το Μαγικό Άλμπουμ του Θείου Αλβέρτου</div>
+      <div class="brand-subtitle">Ελληνική Έκδοση (Emme Interactive / Πήγασος)</div>
+    </div>
+    <div class="controls">
+      <button class="btn active" id="mode-toggle-btn" title="Εναλλαγή Trackpad / Άμεσης Αφής">
+        <span id="mode-icon">🖱️</span> <span class="label-text" id="mode-label">Trackpad</span>
+      </button>
+      <button class="btn" id="drag-btn-top" title="Κράτημα Κλικ (Σύρσιμο αντικειμένων)">
+        <span>✋</span> <span class="label-text">Σύρσιμο</span>
+      </button>
+      <button class="btn" id="skip-btn" title="Παράλειψη Εισαγωγής / Βίντεο">
+        <span>⏭</span> <span class="label-text">Παράλειψη</span>
+      </button>
+      <button class="btn" id="keyboard-btn" title="Πληκτρολόγιο (Ελληνικά & Λατινικά)">
+        <span>⌨</span> <span class="label-text">Πληκτρολόγιο</span>
+      </button>
+      <button class="btn" id="help-btn" title="Οδηγίες Χειρισμού">
+        <span>？</span> <span class="label-text">Βοήθεια</span>
+      </button>
+      <button class="btn" id="fullscreen-btn" title="Πλήρης Οθόνη">
+        <span>⛶</span> <span class="label-text">Πλήρης Οθόνη</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="mobile-kb-bar" role="region" aria-label="Πληκτρολόγιο Εισαγωγής Ονόματος">
+    <input
+      id="mobile-kb-input"
+      type="text"
+      inputmode="text"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      placeholder="Πληκτρολογήστε όνομα (Ελληνικά ή Λατινικά)..."
+    />
+    <button type="button" class="kb-key-btn" id="kb-bs-btn" title="Διαγραφή (Backspace)">⌫</button>
+    <button type="button" class="kb-key-btn" id="kb-enter-btn" title="Επιβεβαίωση (Enter)">↵ Enter</button>
+    <button type="button" class="kb-key-btn" id="kb-esc-btn" title="Παράλειψη (Escape)">Esc</button>
+    <button type="button" class="kb-key-btn" id="kb-close-btn" title="Κλείσιμο">✕</button>
+  </div>
+
+  <main id="stage-area">
+    <div class="viewport-frame" id="viewport-frame">
+      <div id="loading-overlay">
+        <div class="crest">🧭</div>
+        <div class="loading-title">Το Μαγικό Άλμπουμ του Θείου Αλβέρτου</div>
+        <div id="status-text">Προετοιμασία μηχανής mTropolis (WebAssembly)...</div>
+        <div class="progress-track">
+          <div id="progress-bar"></div>
+        </div>
+      </div>
+
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+      <div id="trackpad-cursor" aria-hidden="true">
+        <div class="cursor-ring"></div>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 2L19 11.5L11.5 13.2L15 20.5L12.2 21.8L8.7 14.5L4 19V2Z" fill="#FFF8E7" stroke="#1A120B" stroke-width="1.8" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div id="touch-dock">
+      <button type="button" class="dock-btn" id="drag-lock-btn" title="Κλείδωμα Κλικ & Σύρσιμο (Drag / Hold)">
+        <span>✋</span> <span id="drag-lock-text">Σύρσιμο</span>
+      </button>
+      <button type="button" class="dock-btn" id="skip-dock-btn" title="Παράλειψη Βίντεο">
+        <span>⏭</span> <span>Παράλειψη</span>
+      </button>
+    </div>
+  </main>
+
+  <footer>
+    <div class="kbd-hint">
+      Χειρισμός: <kbd>🖱️ Σύρσιμο</kbd> Κίνηση δείκτη &bull; <kbd>Tap</kbd> Κλικ &bull; <kbd>Διπλό Tap+Σύρσιμο</kbd> ή <kbd>✋</kbd> Μεταφορά αντικειμένων &bull; <kbd>⌨</kbd> Ελληνικά &amp; Λατινικά
+    </div>
+    <div>ScummVM mTropolis WebAssembly &bull; 640×480</div>
+  </footer>
+
+  <div id="help-modal">
+    <div class="modal-card">
+      <h2>Οδηγίες Χειρισμού (Ποντίκι, Trackpad &amp; Πληκτρολόγιο)</h2>
+      <ul>
+        <li><strong>🖱️ Λειτουργία Trackpad (Οθόνες Αφής):</strong> Σύρετε το δάχτυλό σας οπουδήποτε στην οθόνη για να μετακινήσετε σχετικά τον δείκτη (όπως σε laptop trackpad). Έτσι λειτουργούν κανονικά ο φακός, η φωτογραφική μηχανή, ο μεγεθυντικός φακός και οι ενδείξεις (Mouse Over).</li>
+        <li><strong>👆 Απλό Κλικ (Tap):</strong> Αγγίξτε στιγμιαία την οθόνη για αριστερό κλικ στη θέση όπου βρίσκεται ο δείκτης.</li>
+        <li><strong>✋ Σύρσιμο Αντικειμένων (Drag &amp; Drop):</strong> Πατήστε το κουμπί <strong>✋ Σύρσιμο</strong> (ή κάντε <strong>Διπλό Tap και κρατήστε πατημένο</strong>) για να πιάσετε αντικείμενα και να τα βάλετε/βγάλετε από την τσάντα (satchel).</li>
+        <li><strong>⌨ Πληκτρολόγιο (Ελληνικά &amp; Λατινικά):</strong> Για να γράψετε το όνομά σας σε ένα νέο άλμπουμ, κάντε κλικ σε ένα τυλιγμένο άλμπουμ, πληκτρολογήστε με Ελληνικούς ή Λατινικούς χαρακτήρες (ή πατήστε <strong>⌨ Πληκτρολόγιο</strong> σε κινητό/tablet) και πατήστε <strong>Enter ↵</strong>.</li>
+        <li><strong>⏭ Παράλειψη Βίντεο:</strong> Κατά τη διάρκεια του βίντεο εισαγωγής, μπορείτε να κάνετε <strong>Tap / Κλικ</strong> οπουδήποτε στην οθόνη ή να πατήσετε <strong>⏭ Παράλειψη</strong> (ή <strong>Esc</strong>) για να μεταβείτε απευθείας στο άλμπουμ.</li>
+      </ul>
+      <button class="btn" id="close-help-btn" style="width: 100%; justify-content: center; padding: 9px;">Κλείσιμο</button>
+    </div>
+  </div>
+
+  <script>
+    const statusText = document.getElementById('status-text');
+    const progressBar = document.getElementById('progress-bar');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const canvas = document.getElementById('canvas');
+    const stageArea = document.getElementById('stage-area');
+    const trackpadCursor = document.getElementById('trackpad-cursor');
+    const modeToggleBtn = document.getElementById('mode-toggle-btn');
+    const modeIcon = document.getElementById('mode-icon');
+    const modeLabel = document.getElementById('mode-label');
+    const dragBtnTop = document.getElementById('drag-btn-top');
+    const dragLockBtn = document.getElementById('drag-lock-btn');
+    const dragLockText = document.getElementById('drag-lock-text');
+    const keyboardBtn = document.getElementById('keyboard-btn');
+    const mobileKbBar = document.getElementById('mobile-kb-bar');
+    const mobileKbInput = document.getElementById('mobile-kb-input');
+
+    // Resolve relative URLs cleanly for ScummVM's Emscripten HTTP filesystem
+    const BASE_URL = new URL('.', window.location.href).href;
+    globalThis.resolveScummUrl = function(url) {
+      if (!url) return url;
+      if (/^(https?:|blob:|data:)/i.test(url)) return url;
+      const clean = url.replace(/^\/+/, '');
+      return new URL(clean, BASE_URL).href;
+    };
+
+    function updateProgress(text, pct) {
+      if (text) statusText.textContent = text;
+      if (typeof pct === 'number') {
+        progressBar.style.width = Math.max(8, Math.min(100, pct)) + '%';
+      }
+    }
+
+    // Resume WebAudio contexts on first user interaction
+    const resumeAudioContexts = () => {
+      try {
+        if (window.SDL && window.SDL.audioContext && window.SDL.audioContext.state === 'suspended') {
+          window.SDL.audioContext.resume();
+        }
+        if (window.Module && window.Module.SDL2 && window.Module.SDL2.audioContext && window.Module.SDL2.audioContext.state === 'suspended') {
+          window.Module.SDL2.audioContext.resume();
+        }
+      } catch (_) {}
+    };
+    ['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach((evt) => {
+      window.addEventListener(evt, resumeAudioContexts, { passive: true });
+    });
+
+    // =========================================================================
+    // 1. VIRTUAL TRACKPAD & MOUSE CONTROLLER
+    // =========================================================================
+    const state = {
+      trackpadMode: true,     // Relative trackpad mode enabled by default for touch
+      normX: 0.5,             // Normalized cursor X in [0, 1] within canvas
+      normY: 0.5,             // Normalized cursor Y in [0, 1] within canvas
+      dragLocked: false,      // Whether left mouse button is currently held down
+      doubleTapDragging: false,
+      activeTouchId: null,
+      touchStartX: 0,
+      touchStartY: 0,
+      lastTouchX: 0,
+      lastTouchY: 0,
+      touchStartTime: 0,
+      movedDistance: 0,
+      lastTapTime: 0,
+      sensitivity: 1.25
+    };
+    window._trackpadState = state;
+
+    function getCanvasClientCoords() {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = rect.left + state.normX * rect.width;
+      const clientY = rect.top + state.normY * rect.height;
+      return { rect, clientX, clientY };
+    }
+
+    function updateCursorVisual(showOverlay = false) {
+      const rect = canvas.getBoundingClientRect();
+      const x = state.normX * rect.width;
+      const y = state.normY * rect.height;
+      trackpadCursor.style.left = x + 'px';
+      trackpadCursor.style.top = y + 'px';
+      if (showOverlay && state.trackpadMode) {
+        trackpadCursor.classList.add('visible');
+      }
+      const isHolding = state.dragLocked || state.doubleTapDragging;
+      trackpadCursor.classList.toggle('dragging', isHolding);
+      dragBtnTop.classList.toggle('active', state.dragLocked);
+      dragLockBtn.classList.toggle('active', state.dragLocked);
+      dragLockText.textContent = state.dragLocked ? 'Κρατημένο' : 'Σύρσιμο';
+    }
+
+    function dispatchCanvasMouse(type, buttonsMask, buttonCode) {
+      const { clientX, clientY } = getCanvasClientCoords();
+      const evt = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX,
+        clientY,
+        screenX: clientX,
+        screenY: clientY,
+        button: buttonCode,
+        buttons: buttonsMask
+      });
+      canvas.dispatchEvent(evt);
+    }
+
+    function setDragLock(locked) {
+      if (state.dragLocked === locked) return;
+      state.dragLocked = locked;
+      if (locked) {
+        dispatchCanvasMouse('mousemove', 0, 0);
+        dispatchCanvasMouse('mousedown', 1, 0);
+      } else {
+        dispatchCanvasMouse('mouseup', 0, 0);
+      }
+      updateCursorVisual(true);
+    }
+
+    function toggleTrackpadMode() {
+      if (state.dragLocked) setDragLock(false);
+      state.trackpadMode = !state.trackpadMode;
+      modeToggleBtn.classList.toggle('active', state.trackpadMode);
+      modeIcon.textContent = state.trackpadMode ? '🖱️' : '👆';
+      modeLabel.textContent = state.trackpadMode ? 'Trackpad' : 'Άμεση Αφή';
+      if (!state.trackpadMode) {
+        trackpadCursor.classList.remove('visible');
+      } else {
+        updateCursorVisual(true);
+      }
+    }
+
+    modeToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTrackpadMode();
+    });
+
+    dragBtnTop.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setDragLock(!state.dragLocked);
+    });
+
+    dragLockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setDragLock(!state.dragLocked);
+    });
+
+    // Keep desktop physical mouse synced with normalized coordinates
+    canvas.addEventListener('mousemove', (e) => {
+      if (!e.isTrusted) return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        state.normX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        state.normY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        updateCursorVisual(false);
+      }
+    }, { passive: true });
+
+    // Touch handlers on stageArea (acts as a full-screen trackpad on touch devices)
+    stageArea.addEventListener('touchstart', (e) => {
+      if (e.target.closest('#touch-dock')) return;
+      e.preventDefault();
+      resumeAudioContexts();
+
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+
+      state.activeTouchId = touch.identifier;
+      state.touchStartX = touch.clientX;
+      state.touchStartY = touch.clientY;
+      state.lastTouchX = touch.clientX;
+      state.lastTouchY = touch.clientY;
+      state.touchStartTime = performance.now();
+      state.movedDistance = 0;
+
+      if (!state.trackpadMode) {
+        // Direct Touch mode: jump cursor directly to touch point and press
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          state.normX = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+          state.normY = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+        }
+        dispatchCanvasMouse('mousemove', 0, 0);
+        dispatchCanvasMouse('mousedown', 1, 0);
+        return;
+      }
+
+      // Relative Trackpad mode: check for double-tap-and-drag
+      const now = performance.now();
+      if (!state.dragLocked && (now - state.lastTapTime) < 320) {
+        state.doubleTapDragging = true;
+        dispatchCanvasMouse('mousemove', 0, 0);
+        dispatchCanvasMouse('mousedown', 1, 0);
+      }
+      updateCursorVisual(true);
+    }, { passive: false });
+
+    stageArea.addEventListener('touchmove', (e) => {
+      if (e.target.closest('#touch-dock')) return;
+      e.preventDefault();
+
+      let touch = null;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === state.activeTouchId) {
+          touch = e.changedTouches[i];
+          break;
+        }
+      }
+      if (!touch) touch = e.changedTouches[0];
+      if (!touch) return;
+
+      const dx = touch.clientX - state.lastTouchX;
+      const dy = touch.clientY - state.lastTouchY;
+      state.lastTouchX = touch.clientX;
+      state.lastTouchY = touch.clientY;
+      state.movedDistance += Math.hypot(dx, dy);
+
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      if (!state.trackpadMode) {
+        state.normX = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+        state.normY = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+        dispatchCanvasMouse('mousemove', 1, 0);
+        return;
+      }
+
+      // Mild pointer acceleration for large sweeps while keeping 1:1 precision for small moves
+      const speed = Math.hypot(dx, dy);
+      const accel = speed > 14 ? 1.35 : (speed > 6 ? 1.15 : 1.0);
+      const scale = state.sensitivity * accel;
+
+      state.normX = Math.max(0, Math.min(1, state.normX + (dx * scale) / rect.width));
+      state.normY = Math.max(0, Math.min(1, state.normY + (dy * scale) / rect.height));
+
+      const isHolding = state.dragLocked || state.doubleTapDragging;
+      dispatchCanvasMouse('mousemove', isHolding ? 1 : 0, 0);
+      updateCursorVisual(true);
+    }, { passive: false });
+
+    function handleTouchEnd(e) {
+      if (e.target.closest('#touch-dock')) return;
+      e.preventDefault();
+
+      if (!state.trackpadMode) {
+        dispatchCanvasMouse('mouseup', 0, 0);
+        state.activeTouchId = null;
+        return;
+      }
+
+      const elapsed = performance.now() - state.touchStartTime;
+      const wasTap = state.movedDistance < 10 && elapsed < 260;
+
+      if (state.doubleTapDragging) {
+        state.doubleTapDragging = false;
+        dispatchCanvasMouse('mouseup', 0, 0);
+        state.lastTapTime = 0;
+      } else if (wasTap) {
+        if (state.dragLocked) {
+          // Tapping while drag-lock is active drops the item
+          setDragLock(false);
+        } else {
+          dispatchCanvasMouse('mousemove', 0, 0);
+          dispatchCanvasMouse('mousedown', 1, 0);
+          setTimeout(() => {
+            dispatchCanvasMouse('mouseup', 0, 0);
+          }, 35);
+          state.lastTapTime = performance.now();
+        }
+      }
+
+      state.activeTouchId = null;
+      updateCursorVisual(true);
+    }
+
+    stageArea.addEventListener('touchend', handleTouchEnd, { passive: false });
+    stageArea.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    // Programmatic helpers for automated tests
+    window._trackpadMove = function(deltaX, deltaY) {
+      const rect = canvas.getBoundingClientRect();
+      state.normX = Math.max(0, Math.min(1, state.normX + deltaX / rect.width));
+      state.normY = Math.max(0, Math.min(1, state.normY + deltaY / rect.height));
+      const isHolding = state.dragLocked || state.doubleTapDragging;
+      dispatchCanvasMouse('mousemove', isHolding ? 1 : 0, 0);
+      updateCursorVisual(true);
+      return { normX: state.normX, normY: state.normY, gameX: Math.round(state.normX * 640), gameY: Math.round(state.normY * 480) };
+    };
+
+    window._trackpadMoveToGameCoords = function(gameX, gameY) {
+      state.normX = Math.max(0, Math.min(1, gameX / 640));
+      state.normY = Math.max(0, Math.min(1, gameY / 480));
+      const isHolding = state.dragLocked || state.doubleTapDragging;
+      dispatchCanvasMouse('mousemove', isHolding ? 1 : 0, 0);
+      updateCursorVisual(true);
+      return { normX: state.normX, normY: state.normY, gameX, gameY };
+    };
+
+    window._trackpadTap = function() {
+      dispatchCanvasMouse('mousemove', 0, 0);
+      dispatchCanvasMouse('mousedown', 1, 0);
+      dispatchCanvasMouse('mouseup', 0, 0);
+      updateCursorVisual(true);
+    };
+
+    // =========================================================================
+    // 2. GREEK (WINDOWS-1253 / UNICODE) & LATIN KEYBOARD FORWARDING
+    // =========================================================================
+    function sendSpecialKey(key, code, keyCode) {
+      const opts = { key, code, keyCode, which: keyCode, bubbles: true, cancelable: true };
+      canvas.dispatchEvent(new KeyboardEvent('keydown', opts));
+      canvas.dispatchEvent(new KeyboardEvent('keyup', opts));
+    }
+
+    function sendUnicodeChar(ch) {
+      if (!ch) return;
+      const cp = ch.codePointAt(0);
+      // Use 'Quote' (SDL_SCANCODE_APOSTROPHE) for non-space characters because SDL3's
+      // Emscripten_HandleKey zeroes out keycode when scancode is SDL_SCANCODE_A..Z and keycode < 128.
+      const code = (ch === ' ') ? 'Space' : 'Quote';
+
+      const opts = {
+        key: ch,
+        code,
+        keyCode: cp,
+        charCode: cp,
+        which: cp,
+        shiftKey: false,
+        bubbles: true,
+        cancelable: true
+      };
+      canvas.dispatchEvent(new KeyboardEvent('keydown', opts));
+      canvas.dispatchEvent(new KeyboardEvent('keyup', opts));
+    }
+
+    window._sendTextToGame = function(str) {
+      for (const ch of str) {
+        sendUnicodeChar(ch);
+      }
+    };
+
+    window._sendSpecialKeyToGame = sendSpecialKey;
+
+    function toggleKeyboardBar(forceState) {
+      const willOpen = typeof forceState === 'boolean' ? forceState : !mobileKbBar.classList.contains('open');
+      mobileKbBar.classList.toggle('open', willOpen);
+      keyboardBtn.classList.toggle('active', willOpen);
+      if (willOpen) {
+        mobileKbInput.value = '';
+        setTimeout(() => mobileKbInput.focus(), 20);
+      } else {
+        mobileKbInput.blur();
+        canvas.focus();
+      }
+    }
+
+    keyboardBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleKeyboardBar();
+    });
+
+    document.getElementById('kb-bs-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendSpecialKey('Backspace', 'Backspace', 8);
+      mobileKbInput.focus();
+    });
+
+    document.getElementById('kb-enter-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendSpecialKey('Enter', 'Enter', 13);
+      toggleKeyboardBar(false);
+    });
+
+    document.getElementById('kb-esc-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendSpecialKey('Escape', 'Escape', 27);
+    });
+
+    document.getElementById('skip-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendSpecialKey('Escape', 'Escape', 27);
+    });
+
+    document.getElementById('skip-dock-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendSpecialKey('Escape', 'Escape', 27);
+    });
+
+    document.getElementById('kb-close-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleKeyboardBar(false);
+    });
+
+    // Handle typing inside the on-screen keyboard input field (supports mobile IME, Greek dead keys, and Latin)
+    let isComposing = false;
+    mobileKbInput.addEventListener('compositionstart', () => {
+      isComposing = true;
+    });
+    mobileKbInput.addEventListener('compositionend', (e) => {
+      isComposing = false;
+      const text = e.data || mobileKbInput.value;
+      if (text) {
+        for (const ch of text) sendUnicodeChar(ch);
+      }
+      mobileKbInput.value = '';
+    });
+
+    mobileKbInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        sendSpecialKey('Backspace', 'Backspace', 8);
+        mobileKbInput.value = '';
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        sendSpecialKey('Enter', 'Enter', 13);
+        mobileKbInput.value = '';
+        toggleKeyboardBar(false);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        sendSpecialKey('Escape', 'Escape', 27);
+        toggleKeyboardBar(false);
+      }
+    });
+
+    mobileKbInput.addEventListener('input', () => {
+      if (isComposing) return;
+      const val = mobileKbInput.value;
+      if (val && val.length > 0) {
+        for (const ch of val) {
+          sendUnicodeChar(ch);
+        }
+        mobileKbInput.value = '';
+      }
+    });
+
+    // Intercept physical keyboard events in capture phase so both Greek and shifted Latin
+    // characters are normalized and delivered accurately to #canvas.
+    // Note: In SDL 3.2.4, SetKeymapEntry writes to SDL_GetModState() while SDL_GetKeyFromScancode
+    // reads from SDL_KMOD_NONE. Suppressing Shift/CapsLock from reaching SDL keeps SDL_GetModState()
+    // at SDL_KMOD_NONE while the browser still provides the shifted character in e.key.
+    window.addEventListener('keydown', (e) => {
+      if (!e.isTrusted) return;
+      if (document.activeElement === mobileKbInput) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === 'Shift' || e.key === 'CapsLock') {
+        e.stopImmediatePropagation();
+        return;
+      }
+
+      if (e.key && e.key.length === 1) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        sendUnicodeChar(e.key);
+      } else if (e.target !== canvas && (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter' || e.key === 'Escape')) {
+        e.preventDefault();
+        const codeMap = { Backspace: 8, Delete: 46, Enter: 13, Escape: 27 };
+        sendSpecialKey(e.key, e.code || e.key, codeMap[e.key] || e.keyCode);
+      }
+    }, true);
+
+    window.addEventListener('keyup', (e) => {
+      if (!e.isTrusted) return;
+      if (document.activeElement === mobileKbInput) return;
+      if (e.key === 'Shift' || e.key === 'CapsLock' || (e.key && e.key.length === 1)) {
+        e.stopImmediatePropagation();
+      }
+    }, true);
+
+    // =========================================================================
+    // 3. UI MODALS & FULLSCREEN
+    // =========================================================================
+    document.getElementById('fullscreen-btn').addEventListener('click', () => {
+      const target = document.getElementById('viewport-frame');
+      if (!document.fullscreenElement) {
+        (target.requestFullscreen || target.webkitRequestFullscreen || document.documentElement.requestFullscreen).call(target);
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    });
+
+    const helpModal = document.getElementById('help-modal');
+    document.getElementById('help-btn').addEventListener('click', () => helpModal.classList.add('open'));
+    document.getElementById('close-help-btn').addEventListener('click', () => helpModal.classList.remove('open'));
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) helpModal.classList.remove('open');
+    });
+
+    // =========================================================================
+    // 4. SCUMMVM EMSCRIPTEN MODULE CONFIGURATION
+    // =========================================================================
+    var Module = {
+      preRun: [],
+      postRun: [function() {
+        setTimeout(() => {
+          loadingOverlay.classList.add('hidden');
+          canvas.focus();
+          updateCursorVisual(false);
+        }, 500);
+      }],
+      arguments: (function() {
+        const extra = [];
+        if (window.location.hash && window.location.hash.length > 1) {
+          decodeURI(window.location.hash.substring(1)).split(' ').filter(Boolean).forEach(p => extra.push(p));
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+        return [
+          '--config=/home/web_user/.config/scummvm/scummvm.ini',
+          '--path=/data/albert',
+          '--language=el',
+          '--platform=windows',
+          ...extra,
+          'mtropolis:albert1'
+        ];
+      })(),
+      print: function(text) {
+        console.log('[ScummVM]', text);
+      },
+      printErr: function(text) {
+        console.warn('[ScummVM Err]', text);
+        if (text && (text.includes('AddingWindow') || text.includes('Running Uncle Albert') || text.includes('Boot stream loaded'))) {
+          loadingOverlay.classList.add('hidden');
+        }
+      },
+      canvas: canvas,
+      setStatus: function(text) {
+        if (!text) {
+          updateProgress('Έτοιμο!', 100);
+          setTimeout(() => loadingOverlay.classList.add('hidden'), 350);
+          return;
+        }
+        const m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+        if (m) {
+          const cur = parseFloat(m[2]);
+          const total = parseFloat(m[4]);
+          const pct = total > 0 ? Math.round((cur / total) * 100) : 50;
+          updateProgress('Φόρτωση πόρων παιχνιδιού... ' + pct + '%', pct);
+        } else {
+          updateProgress(text, 65);
+        }
+      },
+      totalDependencies: 0,
+      monitorRunDependencies: function(left) {
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        if (left) {
+          const done = this.totalDependencies - left;
+          const pct = Math.round((done / this.totalDependencies) * 100);
+          updateProgress('Φόρτωση αρχείων (' + done + '/' + this.totalDependencies + ')...', pct);
+        } else {
+          updateProgress('Εκκίνηση άλμπουμ...', 95);
+        }
+      }
+    };
+  </script>
+  <script async type="text/javascript" src="scummvm.js"></script>
+</body>
+</html>

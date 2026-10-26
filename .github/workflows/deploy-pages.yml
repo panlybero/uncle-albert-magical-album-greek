@@ -1,0 +1,53 @@
+name: Deploy Web Player to GitHub Pages
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Download & Bundle Game Assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p web/data/albert /tmp/game_download
+          echo "Downloading game data from release v1.0.0-preservation..."
+          gh release download v1.0.0-preservation --repo panlybero/uncle-albert-magical-album-greek --pattern "albert_game_data.zip" -D /tmp/game_download
+          echo "Extracting game assets into web/data/albert..."
+          unzip -q /tmp/game_download/albert_game_data.zip -d web/data/albert
+          echo "Generating HTTP filesystem indexes..."
+          python3 tools/build-make_http_index.py web/data
+          echo "Splitting 359 MB album_gr2.MPX into 16 MB CDN shards for GitHub Pages..."
+          split -b 16777216 -d -a 2 web/data/albert/ALBUM/DATA/album_gr2.MPX web/data/albert/ALBUM/DATA/album_gr2.MPX.part
+          rm -f web/data/albert/ALBUM/DATA/album_gr2.MPX
+          rm -rf /tmp/game_download
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'web'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

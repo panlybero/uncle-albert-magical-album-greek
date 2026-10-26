@@ -1,0 +1,10 @@
+{
+  "name": "Το Μαγικό Άλμπουμ του Θείου Αλβέρτου",
+  "short_name": "Θείος Αλβέρτος",
+  "description": "Το Μαγικό Άλμπουμ του Θείου Αλβέρτου (Greek Windows Edition) — Browser Edition",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0d0a07",
+  "theme_color": "#1a130c"
+}

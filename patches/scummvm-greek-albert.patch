@@ -638,21 +638,29 @@ index 7d7b3f89..5005eb5e 100644
  	  // Original title: Alberts abenteuerliche Reise
  	  // Published by Tivola, 2000
 diff --git a/engines/mtropolis/elements.cpp b/engines/mtropolis/elements.cpp
-index 56f05d8d..6f34277b 100644
+index 56f05d8d..01011eac 100644
 --- a/engines/mtropolis/elements.cpp
 +++ b/engines/mtropolis/elements.cpp
-@@ -81,8 +81,9 @@ MiniscriptInstructionOutcome GraphicElement::writeRefAttribute(MiniscriptThread
+@@ -80,10 +80,16 @@ MiniscriptInstructionOutcome GraphicElement::writeRefAttribute(MiniscriptThread
+ 
  
  void GraphicElement::render(Window *window) {
++	if (_rect.isEmpty()) {
++		_mask.reset();
++		return;
++	}
++
  	bool haveEffect = (_bottomRightBevelShading != 0 || _topLeftBevelShading != 0 || _interiorShading != 0);
 +	bool haveDisplayedBitmap = (_displayedBitmap && !_displayedBitmap->empty());
  
 -	if (!haveEffect) {
+-		if (_renderProps.getInkMode() == VisualElementRenderProperties::kInkModeDefault || _renderProps.getInkMode() == VisualElementRenderProperties::kInkModeInvisible || _rect.isEmpty()) {
 +	if (!haveEffect && !haveDisplayedBitmap) {
- 		if (_renderProps.getInkMode() == VisualElementRenderProperties::kInkModeDefault || _renderProps.getInkMode() == VisualElementRenderProperties::kInkModeInvisible || _rect.isEmpty()) {
++		if (_renderProps.getInkMode() == VisualElementRenderProperties::kInkModeDefault || _renderProps.getInkMode() == VisualElementRenderProperties::kInkModeInvisible) {
  			// Not rendered at all
  			_mask.reset();
-@@ -349,6 +350,17 @@ void GraphicElement::render(Window *window) {
+ 			return;
+@@ -349,6 +355,17 @@ void GraphicElement::render(Window *window) {
  	if (clippedSrcRect.isEmpty())
  		return;
  
@@ -670,7 +678,7 @@ index 56f05d8d..6f34277b 100644
  	int32 srcToDestY = clippedDrawRect.top - clippedSrcRect.top;
  
  	switch (_renderProps.getInkMode()) {
-@@ -879,8 +891,10 @@ void MovieElement::playMedia(Runtime *runtime, Project *project) {
+@@ -879,8 +896,10 @@ void MovieElement::playMedia(Runtime *runtime, Project *project) {
  					framesDecodedThisFrame++;
  					_displayFrame = decodedFrame;
  					_scaledFrame.reset();
@@ -682,7 +690,7 @@ index 56f05d8d..6f34277b 100644
  				}
  			}
  
-@@ -1211,6 +1225,9 @@ bool ImageElement::readAttribute(MiniscriptThread *thread, DynamicValue &result,
+@@ -1211,6 +1230,9 @@ bool ImageElement::readAttribute(MiniscriptThread *thread, DynamicValue &result,
  		// prompt buttons aren't layered correctly?
  		result.setString(_text);
  		return true;
@@ -692,7 +700,7 @@ index 56f05d8d..6f34277b 100644
  	}
  
  	return VisualElement::readAttribute(thread, result, attrib);
-@@ -1223,6 +1240,9 @@ MiniscriptInstructionOutcome ImageElement::writeRefAttribute(MiniscriptThread *t
+@@ -1223,6 +1245,9 @@ MiniscriptInstructionOutcome ImageElement::writeRefAttribute(MiniscriptThread *t
  	} else if (attrib == "flushpriority") {
  		DynamicValueWriteFuncHelper<ImageElement, &ImageElement::scriptSetFlushPriority, true>::create(this, writeProxy);
  		return kMiniscriptInstructionOutcomeContinue;
@@ -702,7 +710,17 @@ index 56f05d8d..6f34277b 100644
  	}
  
  	return VisualElement::writeRefAttribute(thread, writeProxy, attrib);
-@@ -1267,6 +1287,7 @@ void ImageElement::render(Window *window) {
+@@ -1257,6 +1282,9 @@ void ImageElement::tryAutoSetName(Runtime *runtime, Project *project) {
+ }
+ 
+ void ImageElement::render(Window *window) {
++	if (_rect.isEmpty())
++		return;
++
+ 	if (_cachedImage) {
+ 		VisualElementRenderProperties::InkMode inkMode = _renderProps.getInkMode();
+ 
+@@ -1267,6 +1295,7 @@ void ImageElement::render(Window *window) {
  		Common::Rect srcRect(optimized->w, optimized->h);
  		Common::Rect destRect(_cachedAbsoluteOrigin.x, _cachedAbsoluteOrigin.y, _cachedAbsoluteOrigin.x + _rect.width(), _cachedAbsoluteOrigin.y + _rect.height());
  
@@ -710,7 +728,7 @@ index 56f05d8d..6f34277b 100644
  		if (optimized->format.bytesPerPixel == 1) {
  			// FIXME: Pass palette to blit functions instead
  			if (_cachedImage->getOriginalColorDepth() == kColorDepthMode1Bit) {
-@@ -1276,7 +1297,7 @@ void ImageElement::render(Window *window) {
+@@ -1276,7 +1305,7 @@ void ImageElement::render(Window *window) {
  				};
  				optimized->setPalette(bwPalette, 0, 2);
  			} else {
@@ -719,7 +737,7 @@ index 56f05d8d..6f34277b 100644
  				if (!palette)
  					palette = &getRuntime()->getGlobalPalette();
  
-@@ -1298,26 +1319,79 @@ void ImageElement::render(Window *window) {
+@@ -1298,26 +1327,135 @@ void ImageElement::render(Window *window) {
  
  		if (inkMode == VisualElementRenderProperties::kInkModeBackgroundMatte || inkMode == VisualElementRenderProperties::kInkModeBackgroundTransparent) {
  			const ColorRGB8 transColorRGB8 = _renderProps.getBackColor();
@@ -752,7 +770,64 @@ index 56f05d8d..6f34277b 100644
 +					transColor = optimized->format.ARGBToColor(255, transColorRGB8.r, transColorRGB8.g, transColorRGB8.b);
 +			}
  
- 			window->getSurface()->transBlitFrom(*optimized, srcRect, destRect, transColor, false, alpha);
+-			window->getSurface()->transBlitFrom(*optimized, srcRect, destRect, transColor, false, alpha);
++			Common::Point rotSize;
++			Common::Point rotAxis;
++			double rotAngle = 0.0;
++			bool hasRotator = false;
++			for (const Common::SharedPtr<Modifier> &modifier : _modifiers) {
++				if (modifier->getRotatorProperties(getRuntime(), rotSize, rotAxis, rotAngle)) {
++					hasRotator = true;
++					break;
++				}
++			}
++
++			if (hasRotator && rotSize.x > 0 && rotSize.y > 0 && optimized->w > 0 && optimized->h > 0) {
++				Graphics::ManagedSurface *dstSurf = window->getSurface().get();
++				Common::Rect clipRect = destRect.findIntersectingRect(Common::Rect(0, 0, dstSurf->w, dstSurf->h));
++				double cx = _cachedAbsoluteOrigin.x + _rect.width() * 0.5;
++				double cy = _cachedAbsoluteOrigin.y + _rect.height() * 0.5;
++				double rad = rotAngle * M_PI / 180.0;
++				double cosA = cos(rad);
++				double sinA = sin(rad);
++				uint32 exactTransColor = (optimized->format.bytesPerPixel == 1) ? transColor : optimized->format.ARGBToColor(255, transColorRGB8.r, transColorRGB8.g, transColorRGB8.b);
++
++				for (int32 sy = clipRect.top; sy < clipRect.bottom; sy++) {
++					for (int32 sx = clipRect.left; sx < clipRect.right; sx++) {
++						double dx = (sx + 0.5) - cx;
++						double dy = (sy + 0.5) - cy;
++						double rx = dx * cosA + dy * sinA;
++						double ry = -dx * sinA + dy * cosA;
++						double bx = rx + rotSize.x * 0.5 + rotAxis.x;
++						double by = ry + rotSize.y * 0.5 + rotAxis.y;
++						if (bx >= 0.0 && bx < rotSize.x && by >= 0.0 && by < rotSize.y) {
++							int32 mx = static_cast<int32>((bx * optimized->w) / rotSize.x);
++							int32 my = static_cast<int32>((by * optimized->h) / rotSize.y);
++							if (mx >= 0 && mx < optimized->w && my >= 0 && my < optimized->h) {
++								uint32 pix = optimized->getPixel(mx, my);
++								if (pix == exactTransColor || pix == transColor)
++									continue;
++								uint32 dstPix = pix;
++								if (optimized->format != dstSurf->format) {
++									uint8 r = 0, g = 0, b = 0;
++									if (optimized->format.bytesPerPixel == 1 && palette) {
++										const byte *palData = palette->getPalette();
++										r = palData[pix * 3 + 0];
++										g = palData[pix * 3 + 1];
++										b = palData[pix * 3 + 2];
++									} else {
++										optimized->format.colorToRGB(pix, r, g, b);
++									}
++									dstPix = dstSurf->format.ARGBToColor(255, r, g, b);
++								}
++								dstSurf->setPixel(sx, sy, dstPix);
++							}
++						}
++					}
++				}
++			} else {
++				window->getSurface()->transBlitFrom(*optimized, srcRect, destRect, transColor, false, alpha);
++			}
  		} else if (inkMode == VisualElementRenderProperties::kInkModeDefault || inkMode == VisualElementRenderProperties::kInkModeCopy) {
  			if (alpha != 255) {
 -				warning("Alpha fade was applied to a default or copy image, this isn't supported yet");
@@ -807,7 +882,7 @@ index 56f05d8d..6f34277b 100644
  Common::SharedPtr<Structural> ImageElement::shallowClone() const {
  	return Common::SharedPtr<Structural>(new ImageElement(*this));
  }
-@@ -1340,6 +1414,69 @@ MiniscriptInstructionOutcome ImageElement::scriptSetFlushPriority(MiniscriptThre
+@@ -1340,6 +1478,69 @@ MiniscriptInstructionOutcome ImageElement::scriptSetFlushPriority(MiniscriptThre
  	return kMiniscriptInstructionOutcomeContinue;
  }
  
@@ -877,7 +952,7 @@ index 56f05d8d..6f34277b 100644
  MToonElement::MToonElement()
  	: _cacheBitmap(false), _maintainRate(false), _assetID(0), _rateTimes100000(0), _flushPriority(0), _celStartTimeMSec(0),
  	  _isPlaying(false), _isStopped(false), _renderedFrame(0), _playRange(IntRange(1, 1)), _cel(1), _hasIssuedRenderWarning(false) {
-@@ -1394,6 +1531,9 @@ bool MToonElement::readAttribute(MiniscriptThread *thread, DynamicValue &result,
+@@ -1394,6 +1595,9 @@ bool MToonElement::readAttribute(MiniscriptThread *thread, DynamicValue &result,
  	} else if (attrib == "regpoint") {
  		result.setPoint(_cachedMToon->getMetadata()->registrationPoint);
  		return true;
@@ -887,7 +962,7 @@ index 56f05d8d..6f34277b 100644
  	}
  
  	return VisualElement::readAttribute(thread, result, attrib);
-@@ -1415,6 +1555,9 @@ MiniscriptInstructionOutcome MToonElement::writeRefAttribute(MiniscriptThread *t
+@@ -1415,6 +1619,9 @@ MiniscriptInstructionOutcome MToonElement::writeRefAttribute(MiniscriptThread *t
  	} else if (attrib == "range") {
  		DynamicValueWriteOrRefAttribFuncHelper<MToonElement, &MToonElement::scriptSetRange, &MToonElement::scriptRangeWriteRefAttribute>::create(this, result);
  		return kMiniscriptInstructionOutcomeContinue;
@@ -897,7 +972,16 @@ index 56f05d8d..6f34277b 100644
  	}
  
  	return VisualElement::writeRefAttribute(thread, result, attrib);
-@@ -1562,7 +1705,19 @@ void MToonElement::render(Window *window) {
+@@ -1518,7 +1725,7 @@ bool MToonElement::canAutoPlay() const {
+ void MToonElement::render(Window *window) {
+ 	// Stopped mToons are not supposed to render
+ 	// FIXME: Should this also disable mouse collision?  Should we detect ths somewhere else?
+-	if (_isStopped)
++	if (_isStopped || _rect.isEmpty())
+ 		return;
+ 
+ 	if (_cachedMToon) {
+@@ -1562,7 +1769,30 @@ void MToonElement::render(Window *window) {
  				// Frame rect is a sub-area of the rendered rect
  				srcRect = Common::Rect(frameRect.left, frameRect.top, frameRect.right, frameRect.bottom);
  			}
@@ -915,10 +999,80 @@ index 56f05d8d..6f34277b 100644
 +			} else {
 +				destRect = Common::Rect(_cachedAbsoluteOrigin.x + frameRect.left, _cachedAbsoluteOrigin.y + frameRect.top, _cachedAbsoluteOrigin.x + frameRect.right, _cachedAbsoluteOrigin.y + frameRect.bottom);
 +			}
++
++			Common::Point rotSize;
++			Common::Point rotAxis;
++			double rotAngle = 0.0;
++			bool hasRotator = false;
++			for (const Common::SharedPtr<Modifier> &modifier : _modifiers) {
++				if (modifier->getRotatorProperties(getRuntime(), rotSize, rotAxis, rotAngle)) {
++					hasRotator = true;
++					break;
++				}
++			}
  
  			if (inkMode == VisualElementRenderProperties::kInkModeBackgroundMatte || inkMode == VisualElementRenderProperties::kInkModeBackgroundTransparent) {
  				ColorRGB8 transColorRGB8 = _renderProps.getBackColor();
-@@ -1606,15 +1761,39 @@ bool MToonElement::isMouseCollisionAtPoint(int32 relativeX, int32 relativeY) con
+@@ -1591,7 +1821,57 @@ void MToonElement::render(Window *window) {
+ 				} else
+ 					transColor = _renderSurface->format.ARGBToColor(255, transColorRGB8.r, transColorRGB8.g, transColorRGB8.b);
+ 
+-				window->getSurface()->transBlitFrom(*_renderSurface, srcRect, destRect, transColor);
++				if (hasRotator && rotSize.x > 0 && rotSize.y > 0 && origW > 0 && origH > 0) {
++					Graphics::ManagedSurface *dstSurf = window->getSurface().get();
++					Common::Rect elemDestRect(_cachedAbsoluteOrigin.x, _cachedAbsoluteOrigin.y, _cachedAbsoluteOrigin.x + curW, _cachedAbsoluteOrigin.y + curH);
++					Common::Rect clipRect = elemDestRect.findIntersectingRect(Common::Rect(0, 0, dstSurf->w, dstSurf->h));
++					double cx = _cachedAbsoluteOrigin.x + curW * 0.5;
++					double cy = _cachedAbsoluteOrigin.y + curH * 0.5;
++					double rad = rotAngle * M_PI / 180.0;
++					double cosA = cos(rad);
++					double sinA = sin(rad);
++					bool floatingFrame = (frameRect.width() == _renderSurface->w && frameRect.height() == _renderSurface->h);
++
++					for (int32 sy = clipRect.top; sy < clipRect.bottom; sy++) {
++						for (int32 sx = clipRect.left; sx < clipRect.right; sx++) {
++							double dx = (sx + 0.5) - cx;
++							double dy = (sy + 0.5) - cy;
++							double rx = dx * cosA + dy * sinA;
++							double ry = -dx * sinA + dy * cosA;
++							double bx = rx + rotSize.x * 0.5 + rotAxis.x;
++							double by = ry + rotSize.y * 0.5 + rotAxis.y;
++							if (bx >= 0.0 && bx < rotSize.x && by >= 0.0 && by < rotSize.y) {
++								int32 mx = static_cast<int32>((bx * origW) / rotSize.x);
++								int32 my = static_cast<int32>((by * origH) / rotSize.y);
++								if (mx >= frameRect.left && mx < frameRect.right && my >= frameRect.top && my < frameRect.bottom) {
++									int32 surfX = floatingFrame ? (mx - frameRect.left) : mx;
++									int32 surfY = floatingFrame ? (my - frameRect.top) : my;
++									if (surfX >= 0 && surfX < _renderSurface->w && surfY >= 0 && surfY < _renderSurface->h) {
++										uint32 pix = _renderSurface->getPixel(surfX, surfY);
++										if (pix == transColor)
++											continue;
++										uint32 dstPix = pix;
++										if (_renderSurface->format != dstSurf->format) {
++											uint8 r = 0, g = 0, b = 0;
++											if (_renderSurface->format.bytesPerPixel == 1 && palette) {
++												const byte *palData = palette->getPalette();
++												r = palData[pix * 3 + 0];
++												g = palData[pix * 3 + 1];
++												b = palData[pix * 3 + 2];
++											} else {
++												_renderSurface->format.colorToRGB(pix, r, g, b);
++											}
++											dstPix = dstSurf->format.ARGBToColor(255, r, g, b);
++										}
++										dstSurf->setPixel(sx, sy, dstPix);
++									}
++								}
++							}
++						}
++					}
++				} else {
++					window->getSurface()->transBlitFrom(*_renderSurface, srcRect, destRect, transColor);
++				}
+ 			} else if (inkMode == VisualElementRenderProperties::kInkModeCopy || inkMode == VisualElementRenderProperties::kInkModeDefault) {
+ 				window->getSurface()->blitFrom(*_renderSurface, srcRect, destRect);
+ 			} else {
+@@ -1606,15 +1886,65 @@ bool MToonElement::isMouseCollisionAtPoint(int32 relativeX, int32 relativeY) con
  	relativeY -= _rect.top;
  
  	if (_renderSurface) {
@@ -926,7 +1080,33 @@ index 56f05d8d..6f34277b 100644
 +		int32 origH = _metadata->rect.height();
 +		int32 curW = _rect.width();
 +		int32 curH = _rect.height();
-+		if (origW > 0 && origH > 0 && curW > 0 && curH > 0 && (curW != origW || curH != origH)) {
++
++		Common::Point rotSize;
++		Common::Point rotAxis;
++		double rotAngle = 0.0;
++		bool hasRotator = false;
++		for (const Common::SharedPtr<Modifier> &modifier : _modifiers) {
++			if (modifier->getRotatorProperties(getRuntime(), rotSize, rotAxis, rotAngle)) {
++				hasRotator = true;
++				break;
++			}
++		}
++
++		if (hasRotator && rotSize.x > 0 && rotSize.y > 0 && origW > 0 && origH > 0) {
++			double dx = (relativeX + 0.5) - curW * 0.5;
++			double dy = (relativeY + 0.5) - curH * 0.5;
++			double rad = rotAngle * M_PI / 180.0;
++			double cosA = cos(rad);
++			double sinA = sin(rad);
++			double rx = dx * cosA + dy * sinA;
++			double ry = -dx * sinA + dy * cosA;
++			double bx = rx + rotSize.x * 0.5 + rotAxis.x;
++			double by = ry + rotSize.y * 0.5 + rotAxis.y;
++			if (bx < 0.0 || bx >= rotSize.x || by < 0.0 || by >= rotSize.y)
++				return false;
++			relativeX = static_cast<int32>((bx * origW) / rotSize.x);
++			relativeY = static_cast<int32>((by * origH) / rotSize.y);
++		} else if (origW > 0 && origH > 0 && curW > 0 && curH > 0 && (curW != origW || curH != origH)) {
 +			relativeX = (relativeX * origW) / curW;
 +			relativeY = (relativeY * origH) / curH;
 +		}
@@ -960,7 +1140,7 @@ index 56f05d8d..6f34277b 100644
  
  			if (frameRect.width() == _renderSurface->w && frameRect.height() == _renderSurface->h) {
  				// Frame rect is the size of the render surface, meaning the frame is floating and we need to adjust to its coordinates
-@@ -1845,6 +2024,77 @@ MiniscriptInstructionOutcome MToonElement::scriptSetCel(MiniscriptThread *thread
+@@ -1845,6 +2175,78 @@ MiniscriptInstructionOutcome MToonElement::scriptSetCel(MiniscriptThread *thread
  	return kMiniscriptInstructionOutcomeContinue;
  }
  
@@ -1010,6 +1190,7 @@ index 56f05d8d..6f34277b 100644
 +	uint hackFlags = 0;
 +	_cachedMToon = static_cast<MToonAsset *>(asset.get())->loadAndCacheMToon(getRuntime(), hackFlags);
 +	_metadata = _cachedMToon->getMetadata();
++
 +	_assetID = asset->getAssetID();
 +	_renderSurface.reset();
 +	_renderedFrame = 0;
@@ -1038,7 +1219,7 @@ index 56f05d8d..6f34277b 100644
  MiniscriptInstructionOutcome MToonElement::scriptSetRange(MiniscriptThread *thread, const DynamicValue &value) {
  	if (value.getType() == DynamicValueTypes::kIntegerRange)
  		return scriptSetRangeTyped(thread, value.getIntRange());
-@@ -1989,12 +2239,13 @@ MiniscriptInstructionOutcome MToonElement::scriptSetRate(MiniscriptThread *threa
+@@ -1989,12 +2391,13 @@ MiniscriptInstructionOutcome MToonElement::scriptSetRate(MiniscriptThread *threa
  
  
  TextLabelElement::TextLabelElement()
@@ -1054,7 +1235,7 @@ index 56f05d8d..6f34277b 100644
  	, _assetID(other._assetID), _text(other._text), _macFontID(other._macFontID), _fontFamilyName(other._fontFamilyName)
  	, _size(other._size), _alignment(other._alignment), _styleFlags(other._styleFlags), _macFormattingSpans(other._macFormattingSpans)
  	, _renderedText(nullptr) {
-@@ -2004,12 +2255,223 @@ TextLabelElement::TextLabelElement(const TextLabelElement &other)
+@@ -2004,12 +2407,223 @@ TextLabelElement::TextLabelElement(const TextLabelElement &other)
  }
  
  TextLabelElement::~TextLabelElement() {
@@ -1278,7 +1459,7 @@ index 56f05d8d..6f34277b 100644
  bool TextLabelElement::load(ElementLoaderContext &context, const Data::TextLabelElement &data) {
  	if (!loadCommon(data.name, data.guid, data.rect1, data.elementFlags, data.layer, 0, data.sectionID))
  		return false;
-@@ -2079,6 +2541,9 @@ MiniscriptInstructionOutcome TextLabelElement::writeRefAttributeIndexed(Miniscri
+@@ -2079,6 +2693,9 @@ MiniscriptInstructionOutcome TextLabelElement::writeRefAttributeIndexed(Miniscri
  
  void TextLabelElement::activate() {
  	Project *project = getRuntime()->getProject();
@@ -1288,7 +1469,7 @@ index 56f05d8d..6f34277b 100644
  	Common::SharedPtr<Asset> asset = project->getAssetByID(_assetID).lock();
  
  	if (!asset) {
-@@ -2106,6 +2571,10 @@ void TextLabelElement::activate() {
+@@ -2106,10 +2723,14 @@ void TextLabelElement::activate() {
  }
  
  void TextLabelElement::deactivate() {
@@ -1299,7 +1480,12 @@ index 56f05d8d..6f34277b 100644
  }
  
  void TextLabelElement::render(Window *window) {
-@@ -2132,8 +2601,12 @@ void TextLabelElement::render(Window *window) {
+-	if (!_visible)
++	if (!_visible || _rect.isEmpty())
+ 		return;
+ 
+ 	int renderWidth = _rect.width();
+@@ -2132,8 +2753,12 @@ void TextLabelElement::render(Window *window) {
  		const Graphics::Font *font = nullptr;
  		if (_fontFamilyName.size() > 0) {
  			font = FontMan.getFontByName(_fontFamilyName.c_str());
@@ -1314,7 +1500,7 @@ index 56f05d8d..6f34277b 100644
  		} else if (_macFontID != 0) {
  			// TODO: Formatting spans
  			int slant = 0;
-@@ -2166,6 +2639,10 @@ void TextLabelElement::render(Window *window) {
+@@ -2166,6 +2791,10 @@ void TextLabelElement::render(Window *window) {
  		if (!font)
  			font = FontMan.getFontByUsage(Graphics::FontManager::kGUIFont);
  
@@ -1325,7 +1511,7 @@ index 56f05d8d..6f34277b 100644
  		int height = font->getFontHeight();
  		int ascent = font->getFontAscent();
  
-@@ -2205,7 +2682,7 @@ void TextLabelElement::render(Window *window) {
+@@ -2205,7 +2834,7 @@ void TextLabelElement::render(Window *window) {
  				size_t lineCommitted = 0;
  				bool prevWasWhitespace = true;
  				for (size_t i = 0; i <= lineStr.size(); i++) {
@@ -1334,7 +1520,7 @@ index 56f05d8d..6f34277b 100644
  
  					if (isWhitespace) {
  						if (!prevWasWhitespace) {
-@@ -2296,8 +2773,9 @@ Graphics::FontManager::FontUsage TextLabelElement::getDefaultUsageForMacFont(uin
+@@ -2296,8 +2925,9 @@ Graphics::FontManager::FontUsage TextLabelElement::getDefaultUsageForMacFont(uin
  
  Graphics::FontManager::FontUsage TextLabelElement::getDefaultUsageForNamedFont(const Common::String &fontFamilyName, uint size) {
  	if (fontFamilyName == "Courier New") {
@@ -1345,7 +1531,7 @@ index 56f05d8d..6f34277b 100644
  	} else if (fontFamilyName == "Arial") {
  		if (size == 10)
  			return Graphics::FontManager::kGUIFont;
-@@ -2466,7 +2944,7 @@ MiniscriptInstructionOutcome SoundElement::writeRefAttribute(MiniscriptThread *t
+@@ -2466,7 +3096,7 @@ MiniscriptInstructionOutcome SoundElement::writeRefAttribute(MiniscriptThread *t
  		DynamicValueWriteFuncHelper<SoundElement, &SoundElement::scriptSetBalance, true>::create(this, writeProxy);
  		return kMiniscriptInstructionOutcomeContinue;
  	} else if (attrib == "asset") {
@@ -1354,7 +1540,7 @@ index 56f05d8d..6f34277b 100644
  		return kMiniscriptInstructionOutcomeContinue;
  	}
  
-@@ -2568,7 +3046,9 @@ void SoundElement::playMedia(Runtime *runtime, Project *project) {
+@@ -2568,7 +3198,9 @@ void SoundElement::playMedia(Runtime *runtime, Project *project) {
  			}
  
  			if (!_player) {
@@ -1365,7 +1551,7 @@ index 56f05d8d..6f34277b 100644
  
  				int normalizedVolume = (_leftVolume + _rightVolume) * 255 / 200;
  				int normalizedBalance = _balance * 127 / 100;
-@@ -2725,10 +3205,8 @@ MiniscriptInstructionOutcome SoundElement::scriptSetAsset(MiniscriptThread *thre
+@@ -2725,10 +3357,8 @@ MiniscriptInstructionOutcome SoundElement::scriptSetAsset(MiniscriptThread *thre
  	Common::SharedPtr<Asset> asset = project->getAssetByID(assetID).lock();
  
  	if (!asset) {
@@ -1378,7 +1564,7 @@ index 56f05d8d..6f34277b 100644
  	}
  
  	if (!asset) {
-@@ -2746,7 +3224,14 @@ MiniscriptInstructionOutcome SoundElement::scriptSetAsset(MiniscriptThread *thre
+@@ -2746,7 +3376,14 @@ MiniscriptInstructionOutcome SoundElement::scriptSetAsset(MiniscriptThread *thre
  	_assetID = asset->getAssetID();
  
  	return kMiniscriptInstructionOutcomeContinue;
@@ -1740,7 +1926,7 @@ index 4b40e6f6..8856e2f2 100644
  
  	class GetChild : public MiniscriptInstruction {
 diff --git a/engines/mtropolis/modifiers.cpp b/engines/mtropolis/modifiers.cpp
-index 70051fcf..6ccae87c 100644
+index 70051fcf..f151c590 100644
 --- a/engines/mtropolis/modifiers.cpp
 +++ b/engines/mtropolis/modifiers.cpp
 @@ -235,6 +235,57 @@ void BehaviorModifier::visitInternalReferences(IStructuralReferenceVisitor* visi
@@ -1814,7 +2000,47 @@ index 70051fcf..6ccae87c 100644
  
  		if (succeeded) {
  			for (const Common::SharedPtr<SaveLoadHooks> &hooks : runtime->getHacks().saveLoadHooks)
-@@ -1548,18 +1602,7 @@ VThreadState SceneTransitionModifier::consumeMessage(Runtime *runtime, const Com
+@@ -794,18 +848,22 @@ bool SoundEffectModifier::respondsToEvent(const Event &evt) const {
+ 
+ VThreadState SoundEffectModifier::consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
+ 	if (_terminateWhen.respondsTo(msg->getEvent())) {
+-		if (_player) {
+-			_player->stop();
+-			_player.reset();
+-		}
+-	} else if (_executeWhen.respondsTo(msg->getEvent())) {
+ 		disable(runtime);
++	} else if (_executeWhen.respondsTo(msg->getEvent())) {
++		playSound(runtime);
+ 	}
+ 
+ 	return kVThreadReturn;
+ }
+ 
+ void SoundEffectModifier::disable(Runtime *runtime) {
++	if (_player) {
++		_player->stop();
++		_player.reset();
++	}
++}
++
++void SoundEffectModifier::playSound(Runtime *runtime) {
+ 	if (_soundType == kSoundTypeAudioAsset) {
+ 		if (!_cachedAudio)
+ 			loadAndCacheAudio(runtime);
+@@ -829,6 +887,11 @@ void SoundEffectModifier::loadAndCacheAudio(Runtime *runtime) {
+ 	Project *project = runtime->getProject();
+ 	Common::SharedPtr<Asset> asset = project->getAssetByID(_assetID).lock();
+ 
++	if (!asset) {
++		project->forceLoadAsset(_assetID, _forceLoadedAssets);
++		asset = project->getAssetByID(_assetID).lock();
++	}
++
+ 	if (!asset) {
+ 		warning("Sound effect modifier references asset %i but the asset isn't loaded!", _assetID);
+ 		return;
+@@ -1548,18 +1611,7 @@ VThreadState SceneTransitionModifier::consumeMessage(Runtime *runtime, const Com
  	if (_enableWhen.respondsTo(msg->getEvent())) {
  		SceneTransitionEffect effect;
  
@@ -1834,7 +2060,7 @@ index 70051fcf..6ccae87c 100644
  
  		effect._duration = _duration / timeDivisor;
  		effect._steps = _steps;
-@@ -1877,6 +1920,10 @@ CORO_BEGIN_DEFINITION(IfMessengerModifier::RunEvaluateAndSendCoroutine)
+@@ -1877,6 +1929,10 @@ CORO_BEGIN_DEFINITION(IfMessengerModifier::RunEvaluateAndSendCoroutine)
  			CORO_ERROR;
  		CORO_END_IF
  
@@ -1845,7 +2071,7 @@ index 70051fcf..6ccae87c 100644
  		CORO_IF(locals->isTrue)
  			CORO_AWAIT(params->self->_sendSpec.sendFromMessenger(params->runtime, params->self, locals->triggerSource.lock().get(), locals->incomingData, nullptr));
  		CORO_END_IF
-@@ -2393,6 +2440,7 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
+@@ -2393,6 +2449,7 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
  		break;
  	case Common::KEYCODE_KP_ENTER:
  		resolvedType = kEnter;
@@ -1853,7 +2079,7 @@ index 70051fcf..6ccae87c 100644
  		break;
  	case Common::KEYCODE_END:
  		resolvedType = kEnd;
-@@ -2407,9 +2455,11 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
+@@ -2407,9 +2464,11 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
  		break;
  	case Common::KEYCODE_BACKSPACE:
  		resolvedType = kBackspace;
@@ -1865,7 +2091,7 @@ index 70051fcf..6ccae87c 100644
  		break;
  	case Common::KEYCODE_PAGEUP:
  		resolvedType = kPageUp;
-@@ -2419,24 +2469,31 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
+@@ -2419,24 +2478,31 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
  		break;
  	case Common::KEYCODE_RETURN:
  		resolvedType = kReturn;
@@ -1897,7 +2123,7 @@ index 70051fcf..6ccae87c 100644
  		break;
  	default:
  		if (keyEvt.ascii != 0) {
-@@ -2445,6 +2502,15 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
+@@ -2445,6 +2511,15 @@ bool KeyboardMessengerModifier::checkKeyEventTrigger(Runtime *runtime, Common::E
  			Common::U32String u(uchar);
  			outCharStr = u.encode(Common::kMacRoman);
  
@@ -1913,7 +2139,7 @@ index 70051fcf..6ccae87c 100644
  			// STUPID HACK PLEASE FIX ME: ScummVM has no way of just telling us that the character mapping failed,
  			// so we have to check if it encoded "?"
  			if (outCharStr.size() < 1 || (outCharStr[0] == '?' && !isQuestion))
-@@ -2826,6 +2892,10 @@ IModifierContainer *CompoundVariableModifier::getChildContainer() {
+@@ -2826,6 +2901,10 @@ IModifierContainer *CompoundVariableModifier::getChildContainer() {
  	return this;
  }
  
@@ -1924,7 +2150,7 @@ index 70051fcf..6ccae87c 100644
  const Common::Array<Common::SharedPtr<Modifier> > &CompoundVariableModifier::getModifiers() const {
  	return _children;
  }
-@@ -3608,6 +3678,26 @@ bool StringVariableModifier::load(ModifierLoaderContext &context, const Data::St
+@@ -3608,6 +3687,26 @@ bool StringVariableModifier::load(ModifierLoaderContext &context, const Data::St
  	return true;
  }
  
@@ -1952,7 +2178,7 @@ index 70051fcf..6ccae87c 100644
  	DynamicValue stringValue;
  	if (!value.convertToType(DynamicValueTypes::kString, stringValue))
 diff --git a/engines/mtropolis/modifiers.h b/engines/mtropolis/modifiers.h
-index f7527d50..75a41ddb 100644
+index f7527d50..42e3cfeb 100644
 --- a/engines/mtropolis/modifiers.h
 +++ b/engines/mtropolis/modifiers.h
 @@ -57,6 +57,11 @@ public:
@@ -1976,7 +2202,23 @@ index f7527d50..75a41ddb 100644
  	Common::Array<Common::SharedPtr<Modifier> > _children;
  
  	Event _enableWhen;
-@@ -1112,6 +1119,7 @@ public:
+@@ -345,6 +352,7 @@ private:
+ 	};
+ 
+ 	void loadAndCacheAudio(Runtime *runtime);
++	void playSound(Runtime *runtime);
+ 
+ 	Event _executeWhen;
+ 	Event _terminateWhen;
+@@ -355,6 +363,7 @@ private:
+ 	Common::SharedPtr<CachedAudio> _cachedAudio;
+ 	Common::SharedPtr<AudioMetadata> _metadata;
+ 	Common::SharedPtr<AudioPlayer> _player;
++	Common::Array<Common::SharedPtr<Asset> > _forceLoadedAssets;
+ };
+ 
+ class PathMotionModifier : public Modifier {
+@@ -1112,6 +1121,7 @@ public:
  	Common::SharedPtr<ModifierSaveLoad> getSaveLoad(Runtime *runtime) override;
  
  	IModifierContainer *getChildContainer() override;
@@ -1984,7 +2226,7 @@ index f7527d50..75a41ddb 100644
  
  	bool isCompoundVariable() const override { return true; }
  
-@@ -1456,6 +1464,9 @@ public:
+@@ -1456,6 +1466,9 @@ public:
  
  	bool load(ModifierLoaderContext &context, const Data::StringVariableModifier &data);
  
@@ -1994,7 +2236,7 @@ index f7527d50..75a41ddb 100644
  	bool varSetValue(MiniscriptThread *thread, const DynamicValue &value) override;
  	void varGetValue(DynamicValue &dest) const override;
  
-@@ -1505,6 +1516,7 @@ public:
+@@ -1505,6 +1518,7 @@ public:
  
  	bool varSetValue(MiniscriptThread *thread, const DynamicValue &value) override;
  	void varGetValue(DynamicValue &dest) const override;
@@ -3039,7 +3281,7 @@ index 1bb6897b..08a7f83d 100644
  
  		if (havePersistentData) {
 diff --git a/engines/mtropolis/plugin/thereware.cpp b/engines/mtropolis/plugin/thereware.cpp
-index 4a186f02..ddae0adc 100644
+index 4a186f02..6829f602 100644
 --- a/engines/mtropolis/plugin/thereware.cpp
 +++ b/engines/mtropolis/plugin/thereware.cpp
 @@ -19,6 +19,7 @@
@@ -3050,31 +3292,75 @@ index 4a186f02..ddae0adc 100644
  #include "mtropolis/plugin/thereware.h"
  #include "mtropolis/plugins.h"
  
-@@ -26,24 +27,99 @@ namespace MTropolis {
+@@ -26,25 +27,379 @@ namespace MTropolis {
  
  namespace Thereware {
  
 -RotatorModifier::RotatorModifier() {
-+RotatorModifier::RotatorModifier() : _angle(0.0), _paused(false), _show(true), _precision(1) {
++RotatorModifier::RotatorModifier()
++	: _startPaused(false), _startAngle(0), _rate(0.0), _returnToStart(false),
++	  _precision(1), _sendMessages(false), _messageInterval(1),
++	  _sizeToFit(true), _updateRate(10),
++	  _angle(0.0), _paused(false), _show(true), _lastUpdateTime(0) {
  }
  
  RotatorModifier::~RotatorModifier() {
  }
  
  bool RotatorModifier::load(const PlugInModifierLoaderContext &context, const Data::Thereware::RotatorModifier &data) {
++	if (data.unknown1Event.type != Data::PlugInTypeTaggedValue::kEvent || !_enableWhen.load(data.unknown1Event.value.asEvent))
++		return false;
++	if (data.unknown2Event.type != Data::PlugInTypeTaggedValue::kEvent || !_disableWhen.load(data.unknown2Event.value.asEvent))
++		return false;
++	if (data.unknown3Bool.type == Data::PlugInTypeTaggedValue::kBoolean)
++		_startPaused = data.unknown3Bool.value.asBoolean != 0;
 +	if (data.unknown4Int.type == Data::PlugInTypeTaggedValue::kInteger)
-+		_angle = static_cast<double>(data.unknown4Int.value.asInt);
++		_startAngle = data.unknown4Int.value.asInt;
++	if (data.unknown5Float.type == Data::PlugInTypeTaggedValue::kFloat)
++		_rate = Common::XPFloat(data.unknown5Float.value.asFloat.signAndExponent, data.unknown5Float.value.asFloat.mantissa).toDouble();
++	if (data.unknown6Bool.type == Data::PlugInTypeTaggedValue::kBoolean)
++		_returnToStart = data.unknown6Bool.value.asBoolean != 0;
++	if (data.unknown7Point.type == Data::PlugInTypeTaggedValue::kPoint)
++		data.unknown7Point.value.asPoint.toScummVMPoint(_axisOffset);
 +	if (data.unknown8Int.type == Data::PlugInTypeTaggedValue::kInteger)
 +		_precision = data.unknown8Int.value.asInt;
++	if (data.unknown9Bool.type == Data::PlugInTypeTaggedValue::kBoolean)
++		_sendMessages = data.unknown9Bool.value.asBoolean != 0;
++	if (data.unknown10Int.type == Data::PlugInTypeTaggedValue::kInteger)
++		_messageInterval = data.unknown10Int.value.asInt;
++	if (data.unknown15Point.type == Data::PlugInTypeTaggedValue::kPoint)
++		data.unknown15Point.value.asPoint.toScummVMPoint(_size);
++	if (data.unknown16Point.type == Data::PlugInTypeTaggedValue::kPoint)
++		data.unknown16Point.value.asPoint.toScummVMPoint(_offset);
++	if (data.unknown17Point.type == Data::PlugInTypeTaggedValue::kPoint)
++		data.unknown17Point.value.asPoint.toScummVMPoint(_initialSize);
++	if (data.unknown18Bool.type == Data::PlugInTypeTaggedValue::kBoolean)
++		_sizeToFit = data.unknown18Bool.value.asBoolean != 0;
++	if (data.unknown19Point.type == Data::PlugInTypeTaggedValue::kPoint)
++		data.unknown19Point.value.asPoint.toScummVMPoint(_mediaSize);
++	if (data.unknown20Int.type == Data::PlugInTypeTaggedValue::kInteger)
++		_updateRate = data.unknown20Int.value.asInt;
++
++	_angle = static_cast<double>(_startAngle);
++	_paused = _startPaused;
++
  	return true;
  }
  
  bool RotatorModifier::respondsToEvent(const Event &evt) const {
 -	return false;
-+	return evt.eventType == EventIDs::kParentEnabled || evt.eventType == EventIDs::kElementShow;
++	return evt.eventType == EventIDs::kParentEnabled || evt.eventType == EventIDs::kElementShow || _enableWhen.respondsTo(evt) || _disableWhen.respondsTo(evt);
  }
  
  VThreadState RotatorModifier::consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
++	if (_enableWhen.respondsTo(msg->getEvent())) {
++		_paused = _startPaused;
++		_angle = static_cast<double>(_startAngle);
++		_lastUpdateTime = runtime->getPlayTime();
++	}
++	if (_disableWhen.respondsTo(msg->getEvent())) {
++		disable(runtime);
++	}
 +	Structural *owner = findStructuralOwner();
 +	if (owner && owner->isElement() && static_cast<Element *>(owner)->isVisual()) {
 +		VisualElement *visual = static_cast<VisualElement *>(owner);
@@ -3087,6 +3373,58 @@ index 4a186f02..ddae0adc 100644
  	return kVThreadReturn;
  }
  
++void RotatorModifier::updateParentRect(Runtime *runtime) {
++	Structural *owner = findStructuralOwner();
++	if (!owner || !owner->isElement() || !static_cast<Element *>(owner)->isVisual())
++		return;
++	VisualElement *visual = static_cast<VisualElement *>(owner);
++	Common::Rect oldRect = visual->getRelativeRect();
++	Common::Point oldOrigin(oldRect.left + _offset.x, oldRect.top + _offset.y);
++
++	int32 newW = _size.x;
++	int32 newH = _size.y;
++	Common::Point newOffset(0, 0);
++
++	if (_sizeToFit) {
++		double halfW = _size.x * 0.5 + fabs(static_cast<double>(_axisOffset.x));
++		double halfH = _size.y * 0.5 + fabs(static_cast<double>(_axisOffset.y));
++		int32 radius = static_cast<int32>(sqrt(halfW * halfW + halfH * halfH) + 0.5);
++		int32 diam = radius * 2;
++		newW = diam;
++		newH = diam;
++		newOffset.x = (diam - _initialSize.x) / 2;
++		newOffset.y = (diam - _initialSize.y) / 2;
++	}
++
++	_offset = newOffset;
++	Common::Rect newRect(oldOrigin.x - _offset.x, oldOrigin.y - _offset.y, oldOrigin.x - _offset.x + newW, oldOrigin.y - _offset.y + newH);
++	visual->setRelativeRect(newRect);
++}
++
++bool RotatorModifier::getRotatorProperties(Runtime *runtime, Common::Point &outSize, Common::Point &outAxisOffset, double &outAngle) {
++	if (!_paused && _rate != 0.0 && runtime) {
++		uint64 now = runtime->getPlayTime();
++		if (_lastUpdateTime == 0)
++			_lastUpdateTime = now;
++		uint64 deltaMs = now - _lastUpdateTime;
++		uint32 intervalMs = (_updateRate > 0) ? (1000 / _updateRate) : 100;
++		if (deltaMs >= intervalMs) {
++			_angle += _rate * (static_cast<double>(deltaMs) / 1000.0);
++			_angle = fmod(_angle, 360.0);
++			if (_angle < 0.0)
++				_angle += 360.0;
++			_lastUpdateTime = now;
++		}
++	} else if (runtime) {
++		_lastUpdateTime = runtime->getPlayTime();
++	}
++
++	outSize = _size;
++	outAxisOffset = _axisOffset;
++	outAngle = _angle;
++	return true;
++}
++
 +bool RotatorModifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) {
 +	if (attrib == "angle") {
 +		result.setFloat(_angle);
@@ -3094,6 +3432,22 @@ index 4a186f02..ddae0adc 100644
 +	}
 +	if (attrib == "paused") {
 +		result.setBool(_paused);
++		return true;
++	}
++	if (attrib == "rate") {
++		result.setFloat(_rate);
++		return true;
++	}
++	if (attrib == "startangle") {
++		result.setInt(_startAngle);
++		return true;
++	}
++	if (attrib == "returntostart") {
++		result.setBool(_returnToStart);
++		return true;
++	}
++	if (attrib == "sizetofit") {
++		result.setBool(_sizeToFit);
 +		return true;
 +	}
 +	if (attrib == "show") {
@@ -3104,7 +3458,31 @@ index 4a186f02..ddae0adc 100644
 +		result.setInt(_precision);
 +		return true;
 +	}
-+	if (attrib == "size" || attrib == "position" || attrib == "width" || attrib == "height" || attrib == "visible" || attrib == "layer") {
++	if (attrib == "size") {
++		result.setPoint(_size);
++		return true;
++	}
++	if (attrib == "size.x" || attrib == "width") {
++		result.setInt(_size.x);
++		return true;
++	}
++	if (attrib == "size.y" || attrib == "height") {
++		result.setInt(_size.y);
++		return true;
++	}
++	if (attrib == "axisoffset") {
++		result.setPoint(_axisOffset);
++		return true;
++	}
++	if (attrib == "axisoffset.x") {
++		result.setInt(_axisOffset.x);
++		return true;
++	}
++	if (attrib == "axisoffset.y") {
++		result.setInt(_axisOffset.y);
++		return true;
++	}
++	if (attrib == "position" || attrib == "visible" || attrib == "layer") {
 +		Structural *owner = findStructuralOwner();
 +		if (owner && owner->readAttribute(thread, result, attrib))
 +			return true;
@@ -3118,7 +3496,23 @@ index 4a186f02..ddae0adc 100644
 +		return kMiniscriptInstructionOutcomeContinue;
 +	}
 +	if (attrib == "paused") {
-+		DynamicValueWriteBoolHelper::create(&_paused, result);
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetPaused, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "rate") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetRate, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "startangle") {
++		DynamicValueWriteIntegerHelper<int32>::create(&_startAngle, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "returntostart") {
++		DynamicValueWriteBoolHelper::create(&_returnToStart, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "sizetofit") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetSizeToFit, true>::create(this, result);
 +		return kMiniscriptInstructionOutcomeContinue;
 +	}
 +	if (attrib == "show") {
@@ -3129,7 +3523,31 @@ index 4a186f02..ddae0adc 100644
 +		DynamicValueWriteIntegerHelper<int32>::create(&_precision, result);
 +		return kMiniscriptInstructionOutcomeContinue;
 +	}
-+	if (attrib == "size" || attrib == "position" || attrib == "width" || attrib == "height" || attrib == "visible" || attrib == "layer") {
++	if (attrib == "size") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetSize, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "size.x" || attrib == "width") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetSizeX, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "size.y" || attrib == "height") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetSizeY, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "axisoffset") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetAxisOffset, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "axisoffset.x") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetAxisOffsetX, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "axisoffset.y") {
++		DynamicValueWriteFuncHelper<RotatorModifier, &RotatorModifier::scriptSetAxisOffsetY, true>::create(this, result);
++		return kMiniscriptInstructionOutcomeContinue;
++	}
++	if (attrib == "position" || attrib == "visible" || attrib == "layer") {
 +		Structural *owner = findStructuralOwner();
 +		if (owner)
 +			return owner->writeRefAttribute(thread, result, attrib);
@@ -3149,39 +3567,173 @@ index 4a186f02..ddae0adc 100644
 +	return kMiniscriptInstructionOutcomeContinue;
 +}
 +
++MiniscriptInstructionOutcome RotatorModifier::scriptSetRate(MiniscriptThread *thread, const DynamicValue &value) {
++	if (value.getType() == DynamicValueTypes::kFloat) {
++		_rate = value.getFloat();
++	} else if (value.getType() == DynamicValueTypes::kInteger) {
++		_rate = static_cast<double>(value.getInt());
++	}
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetSize(MiniscriptThread *thread, const DynamicValue &value) {
++	if (value.getType() == DynamicValueTypes::kPoint) {
++		Common::Point pt = value.getPoint();
++		if (pt.x >= 2 && pt.y >= 2) {
++			_size = pt;
++			updateParentRect(thread->getRuntime());
++		}
++	}
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetSizeX(MiniscriptThread *thread, const DynamicValue &value) {
++	int32 v = 0;
++	if (value.getType() == DynamicValueTypes::kInteger)
++		v = value.getInt();
++	else if (value.getType() == DynamicValueTypes::kFloat)
++		v = static_cast<int32>(value.getFloat());
++	else
++		return kMiniscriptInstructionOutcomeContinue;
++	if (v >= 2) {
++		_size.x = v;
++		updateParentRect(thread->getRuntime());
++	}
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetSizeY(MiniscriptThread *thread, const DynamicValue &value) {
++	int32 v = 0;
++	if (value.getType() == DynamicValueTypes::kInteger)
++		v = value.getInt();
++	else if (value.getType() == DynamicValueTypes::kFloat)
++		v = static_cast<int32>(value.getFloat());
++	else
++		return kMiniscriptInstructionOutcomeContinue;
++	if (v >= 2) {
++		_size.y = v;
++		updateParentRect(thread->getRuntime());
++	}
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetAxisOffset(MiniscriptThread *thread, const DynamicValue &value) {
++	if (value.getType() == DynamicValueTypes::kPoint) {
++		_axisOffset = value.getPoint();
++		updateParentRect(thread->getRuntime());
++	}
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetAxisOffsetX(MiniscriptThread *thread, const DynamicValue &value) {
++	int32 v = 0;
++	if (value.getType() == DynamicValueTypes::kInteger)
++		v = value.getInt();
++	else if (value.getType() == DynamicValueTypes::kFloat)
++		v = static_cast<int32>(value.getFloat());
++	else
++		return kMiniscriptInstructionOutcomeContinue;
++	_axisOffset.x = v;
++	updateParentRect(thread->getRuntime());
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetAxisOffsetY(MiniscriptThread *thread, const DynamicValue &value) {
++	int32 v = 0;
++	if (value.getType() == DynamicValueTypes::kInteger)
++		v = value.getInt();
++	else if (value.getType() == DynamicValueTypes::kFloat)
++		v = static_cast<int32>(value.getFloat());
++	else
++		return kMiniscriptInstructionOutcomeContinue;
++	_axisOffset.y = v;
++	updateParentRect(thread->getRuntime());
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetPaused(MiniscriptThread *thread, const DynamicValue &value) {
++	if (value.getType() == DynamicValueTypes::kBoolean) {
++		_paused = value.getBool();
++		_lastUpdateTime = thread->getRuntime()->getPlayTime();
++	}
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
++MiniscriptInstructionOutcome RotatorModifier::scriptSetSizeToFit(MiniscriptThread *thread, const DynamicValue &value) {
++	if (value.getType() == DynamicValueTypes::kBoolean) {
++		_sizeToFit = value.getBool();
++		updateParentRect(thread->getRuntime());
++	}
++	return kMiniscriptInstructionOutcomeContinue;
++}
++
  void RotatorModifier::disable(Runtime *runtime) {
++	_paused = true;
++	if (_returnToStart)
++		_angle = static_cast<double>(_startAngle);
  }
  
+ #ifdef MTROPOLIS_DEBUG_ENABLE
 diff --git a/engines/mtropolis/plugin/thereware.h b/engines/mtropolis/plugin/thereware.h
-index 3039a9b0..147d4dea 100644
+index 3039a9b0..5a95fb3e 100644
 --- a/engines/mtropolis/plugin/thereware.h
 +++ b/engines/mtropolis/plugin/thereware.h
-@@ -85,6 +85,9 @@ public:
+@@ -85,6 +85,11 @@ public:
  	bool respondsToEvent(const Event &evt) const override;
  	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
  
 +	bool readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) override;
 +	MiniscriptInstructionOutcome writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) override;
 +
++	bool getRotatorProperties(Runtime *runtime, Common::Point &outSize, Common::Point &outAxisOffset, double &outAngle) override;
++
  	void disable(Runtime *runtime) override;
  
  #ifdef MTROPOLIS_DEBUG_ENABLE
-@@ -95,6 +98,13 @@ public:
+@@ -95,6 +100,41 @@ public:
  private:
  	Common::SharedPtr<Modifier> shallowClone() const override;
  	const char *getDefaultName() const override;
 +
++	void updateParentRect(Runtime *runtime);
++
 +	MiniscriptInstructionOutcome scriptSetAngle(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetRate(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetSize(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetSizeX(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetSizeY(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetAxisOffset(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetAxisOffsetX(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetAxisOffsetY(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetPaused(MiniscriptThread *thread, const DynamicValue &value);
++	MiniscriptInstructionOutcome scriptSetSizeToFit(MiniscriptThread *thread, const DynamicValue &value);
++
++	Event _enableWhen;
++	Event _disableWhen;
++	bool _startPaused;
++	int32 _startAngle;
++	double _rate;
++	bool _returnToStart;
++	Common::Point _axisOffset;
++	int32 _precision;
++	bool _sendMessages;
++	int32 _messageInterval;
++	Common::Point _size;
++	Common::Point _offset;
++	Common::Point _initialSize;
++	bool _sizeToFit;
++	Common::Point _mediaSize;
++	int32 _updateRate;
 +
 +	double _angle;
 +	bool _paused;
 +	bool _show;
-+	int32 _precision;
++	uint64 _lastUpdateTime;
  };
  
  class TrackerModifier : public Modifier {
 diff --git a/engines/mtropolis/runtime.cpp b/engines/mtropolis/runtime.cpp
-index 0a9b567b..99efc4b8 100644
+index 0a9b567b..9cc4f91d 100644
 --- a/engines/mtropolis/runtime.cpp
 +++ b/engines/mtropolis/runtime.cpp
 @@ -23,6 +23,7 @@
@@ -3811,7 +4363,20 @@ index 0a9b567b..99efc4b8 100644
  	// Frame completed
  	return true;
  }
-@@ -5287,6 +5446,14 @@ void Runtime::executeChangeObjectParent(RuntimeObject *object, RuntimeObject *ne
+@@ -5206,6 +5365,12 @@ void Runtime::executeLowLevelSceneStateTransition(const LowLevelSceneStateTransi
+ 	case LowLevelSceneStateTransitionAction::kHideAllElements:
+ 		executeSceneChangeRecursiveVisibilityChange(action.getScene().get(), false);
+ 		break;
++	case LowLevelSceneStateTransitionAction::kUpdateActiveMainScene:
++		_activeMainScene = action.getScene();
++		break;
++	case LowLevelSceneStateTransitionAction::kUpdateActiveSharedScene:
++		_activeSharedScene = action.getScene();
++		break;
+ 	default:
+ 		assert(false);
+ 		break;
+@@ -5287,6 +5452,14 @@ void Runtime::executeChangeObjectParent(RuntimeObject *object, RuntimeObject *ne
  		oldParent->removeChild(structural.get());
  		newParentStructural->addChild(structural);
  
@@ -3826,7 +4391,7 @@ index 0a9b567b..99efc4b8 100644
  		{
  			Common::SharedPtr<MessageProperties> msgProps(new MessageProperties(Event(EventIDs::kParentChanged, 0), DynamicValue(), structural->getSelfReference()));
  			Common::SharedPtr<MessageDispatch> dispatch(new MessageDispatch(msgProps, structural.get(), false, true, false));
-@@ -5334,6 +5501,7 @@ void Runtime::executeCloneObject(RuntimeObject *object) {
+@@ -5334,6 +5507,7 @@ void Runtime::executeCloneObject(RuntimeObject *object) {
  			sendMessageOnVThread(dispatch);
  		}
  	} else if (object->isStructural()) {
@@ -3834,7 +4399,7 @@ index 0a9b567b..99efc4b8 100644
  		Common::SharedPtr<Structural> structuralRef = object->getSelfReference().lock().staticCast<Structural>();
  		Common::WeakPtr<RuntimeObject> relinkParent = structuralRef->getParent()->getSelfReference();
  
-@@ -5343,9 +5511,16 @@ void Runtime::executeCloneObject(RuntimeObject *object) {
+@@ -5343,9 +5517,16 @@ void Runtime::executeCloneObject(RuntimeObject *object) {
  		ObjectRefRemapper remapper(objectRemaps);
  		remapper.visitChildStructuralRef(structuralRef);
  
@@ -3853,7 +4418,142 @@ index 0a9b567b..99efc4b8 100644
  
  		{
  			Common::SharedPtr<MessageProperties> msgProps(new MessageProperties(Event(EventIDs::kClone, 0), DynamicValue(), structuralRef));
-@@ -5816,7 +5991,10 @@ void Runtime::recursiveFindMouseCollision(Structural *&bestResult, int32 &bestLa
+@@ -5457,6 +5638,9 @@ void Runtime::executeCompleteTransitionToScene(const Common::SharedPtr<Structura
+ 			_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeSharedScene, LowLevelSceneStateTransitionAction::kUnload));
+ 		}
+ 
++		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kUpdateActiveSharedScene));
++		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetScene, LowLevelSceneStateTransitionAction::kUpdateActiveMainScene));
++
+ 		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kLoad));
+ 		queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentEnabled, 0), targetSharedScene.get(), true, true);
+ 		queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneStarted, 0), targetSharedScene.get(), true, true);
+@@ -5467,6 +5651,8 @@ void Runtime::executeCompleteTransitionToScene(const Common::SharedPtr<Structura
+ 		sharedSceneEntry.scene = targetSharedScene;
+ 
+ 		_sceneStack[0] = sharedSceneEntry;
++	} else {
++		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetScene, LowLevelSceneStateTransitionAction::kUpdateActiveMainScene));
+ 	}
+ 
+ 	{
+@@ -5486,14 +5672,16 @@ void Runtime::executeCompleteTransitionToScene(const Common::SharedPtr<Structura
+ 	// cleared by the scene transition starting and the cursor reset happens after.  Fix this later...
+ 	_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetScene, LowLevelSceneStateTransitionAction::kAutoResetCursor));
+ 
+-	_activeMainScene = targetScene;
+-	_activeSharedScene = targetSharedScene;
++	if (!_activeMainScene) {
++		_activeMainScene = targetScene;
++		_activeSharedScene = targetSharedScene;
++	}
+ 
+ 	// Scene transitions have to be set up by the destination scene
+ 	_sceneTransitionState = kSceneTransitionStateWaitingForDraw;
+ 	_activeSceneTransitionEffect = nullptr;
+ 
+-	executeSharedScenePostSceneChangeActions();
++	executeSharedScenePostSceneChangeActions(targetScene, targetSharedScene);
+ }
+ 
+ void Runtime::executeHighLevelSceneReturn() {
+@@ -5519,6 +5707,7 @@ void Runtime::executeHighLevelSceneReturn() {
+ 			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentDisabled, 0), _activeMainScene.get(), true, true);
+ 			_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeMainScene, LowLevelSceneStateTransitionAction::kUnload));
+ 
++			_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(sceneReturn.scene, LowLevelSceneStateTransitionAction::kUpdateActiveMainScene));
+ 			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneReactivated, 0), sceneReturn.scene.get(), true, true);
+ 
+ 			for (uint i = 1; i < _sceneStack.size(); i++) {
+@@ -5528,9 +5717,7 @@ void Runtime::executeHighLevelSceneReturn() {
+ 				}
+ 			}
+ 
+-			_activeMainScene = sceneReturn.scene;
+-
+-			executeSharedScenePostSceneChangeActions();
++			executeSharedScenePostSceneChangeActions(sceneReturn.scene, _activeSharedScene);
+ 		} else {
+ 			executeCompleteTransitionToScene(sceneReturn.scene);
+ 		}
+@@ -5584,6 +5771,9 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
+ 							_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeSharedScene, LowLevelSceneStateTransitionAction::kUnload));
+ 						}
+ 
++						_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kUpdateActiveSharedScene));
++						_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetScene, LowLevelSceneStateTransitionAction::kUpdateActiveMainScene));
++
+ 						_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kLoad));
+ 						queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentEnabled, 0), targetSharedScene.get(), true, true);
+ 						queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneStarted, 0), targetSharedScene.get(), true, true);
+@@ -5593,6 +5783,8 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
+ 						sharedSceneEntry.scene = targetScene;
+ 
+ 						_sceneStack[0] = sharedSceneEntry;
++					} else {
++						_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetScene, LowLevelSceneStateTransitionAction::kUpdateActiveMainScene));
+ 					}
+ 
+ 
+@@ -5617,10 +5809,7 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
+ 						_sceneStack.push_back(sceneEntry);
+ 					}
+ 
+-					_activeMainScene = targetScene;
+-					_activeSharedScene = targetSharedScene;
+-
+-					executeSharedScenePostSceneChangeActions();
++					executeSharedScenePostSceneChangeActions(targetScene, targetSharedScene);
+ 				}
+ 			} else {
+ 				executeCompleteTransitionToScene(targetScene);
+@@ -5636,6 +5825,7 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
+ 					_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeSharedScene, LowLevelSceneStateTransitionAction::kUnload));
+ 				}
+ 
++				_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kUpdateActiveSharedScene));
+ 				_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kLoad));
+ 				queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentEnabled, 0), targetSharedScene.get(), true, true);
+ 				queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneStarted, 0), targetSharedScene.get(), true, true);
+@@ -5645,8 +5835,6 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
+ 				sharedSceneEntry.scene = targetSharedScene;
+ 
+ 				_sceneStack[0] = sharedSceneEntry;
+-
+-				_activeSharedScene = targetSharedScene;
+ 			}
+ 
+ 			_sharedSceneWasSetExplicitly = true;
+@@ -5674,20 +5862,20 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
+ 	}
+ }
+ 
+-void Runtime::executeSharedScenePostSceneChangeActions() {
+-	Structural *subsection = _activeMainScene->getParent();
++void Runtime::executeSharedScenePostSceneChangeActions(const Common::SharedPtr<Structural> &targetScene, const Common::SharedPtr<Structural> &targetSharedScene) {
++	Structural *subsection = targetScene->getParent();
+ 
+ 	const Common::Array<Common::SharedPtr<Structural> > &subsectionScenes = subsection->getChildren();
+ 
+-	queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSharedSceneSceneChanged, 0), _activeSharedScene.get(), true, true);
++	queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSharedSceneSceneChanged, 0), targetSharedScene.get(), true, true);
+ 	if (subsectionScenes.size() > 1) {
+-		if (_activeMainScene == subsectionScenes[subsectionScenes.size() - 1])
+-			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSharedSceneNoNextScene, 0), _activeSharedScene.get(), true, true);
+-		if (_activeMainScene == subsectionScenes[1])
+-			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSharedSceneNoPrevScene, 0), _activeSharedScene.get(), true, true);
++		if (targetScene == subsectionScenes[subsectionScenes.size() - 1])
++			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSharedSceneNoNextScene, 0), targetSharedScene.get(), true, true);
++		if (targetScene == subsectionScenes[1])
++			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSharedSceneNoPrevScene, 0), targetSharedScene.get(), true, true);
+ 	}
+ 
+-	_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeMainScene, LowLevelSceneStateTransitionAction::kShowDefaultVisibleElements));
++	_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetScene, LowLevelSceneStateTransitionAction::kShowDefaultVisibleElements));
+ }
+ 
+ void Runtime::recursiveDeactivateStructural(Structural *structural) {
+@@ -5816,7 +6004,10 @@ void Runtime::recursiveFindMouseCollision(Structural *&bestResult, int32 &bestLa
  					}
  				}
  
@@ -3865,7 +4565,7 @@ index 0a9b567b..99efc4b8 100644
  					bestResult = candidate;
  					bestLayer = layer;
  					bestStackHeight = stackHeight;
-@@ -6706,6 +6884,11 @@ void Runtime::onMouseUp(int32 x, int32 y, Actions::MouseButton mButton) {
+@@ -6706,6 +6897,11 @@ void Runtime::onMouseUp(int32 x, int32 y, Actions::MouseButton mButton) {
  }
  
  void Runtime::onKeyboardEvent(const Common::EventType evtType, bool repeat, const Common::KeyState &keyEvt) {
@@ -3877,7 +4577,7 @@ index 0a9b567b..99efc4b8 100644
  	Common::SharedPtr<Window> focusWindow = _keyFocusWindow.lock();
  	if (focusWindow)
  		focusWindow->onKeyboardEvent(evtType, repeat, keyEvt);
-@@ -6964,11 +7147,15 @@ void Runtime::updateCursorElementPosition() {
+@@ -6964,11 +7160,15 @@ void Runtime::updateCursorElementPosition() {
  	if (!element)
  		return;
  
@@ -3896,7 +4596,7 @@ index 0a9b567b..99efc4b8 100644
  	}
  }
  
-@@ -7194,9 +7381,6 @@ bool Runtime::isIdle() const {
+@@ -7194,9 +7394,6 @@ bool Runtime::isIdle() const {
  	if (_pendingClones.size() > 0)
  		return false;
  
@@ -3906,7 +4606,7 @@ index 0a9b567b..99efc4b8 100644
  	if (_pendingShowClonedObject.size() > 0)
  		return false;
  
-@@ -7250,6 +7434,14 @@ void Runtime::queueChangeObjectParent(const Common::WeakPtr<RuntimeObject> &obj,
+@@ -7250,6 +7447,14 @@ void Runtime::queueChangeObjectParent(const Common::WeakPtr<RuntimeObject> &obj,
  	_pendingParentChanges.push_back(ObjectParentChange(obj, newParent));
  }
  
@@ -3921,7 +4621,7 @@ index 0a9b567b..99efc4b8 100644
  void Runtime::hotLoadScene(Structural *structural) {
  	assert(structural->getSceneLoadState() != Structural::SceneLoadState::kNotAScene);
  	loadScene(structural->getSelfReference().lock().staticCast<Structural>());
-@@ -7686,7 +7878,7 @@ Project::Project(Runtime *runtime)
+@@ -7686,7 +7891,7 @@ Project::Project(Runtime *runtime)
  	: Structural(runtime), _projectFormat(Data::kProjectFormatUnknown),
  	  _haveGlobalObjectInfo(false), _haveProjectStructuralDef(false), _playMediaSignaller(new PlayMediaSignaller()),
  	  _keyboardEventSignaller(new KeyboardEventSignaller()),
@@ -3930,7 +4630,7 @@ index 0a9b567b..99efc4b8 100644
  }
  
  Project::~Project() {
-@@ -7739,6 +7931,7 @@ void Project::loadFromDescription(const ProjectDescription &desc, const Hacks &h
+@@ -7739,6 +7944,7 @@ void Project::loadFromDescription(const ProjectDescription &desc, const Hacks &h
  	_cursorGraphics = desc.getCursorGraphics();
  	_subtitles = desc.getSubtitles();
  	_platform = desc.getPlatform();
@@ -3938,7 +4638,7 @@ index 0a9b567b..99efc4b8 100644
  	_rootArchive = desc.getRootArchive();
  	_projectRootDir = desc.getProjectRootDir();
  	_runtimeVersion = desc.getRuntimeVersion();
-@@ -8123,6 +8316,104 @@ Common::SeekableReadStream* Project::getStreamForSegment(int segmentIndex) {
+@@ -8123,6 +8329,104 @@ Common::SeekableReadStream* Project::getStreamForSegment(int segmentIndex) {
  	return _segments[segmentIndex].weakStream;
  }
  
@@ -4043,7 +4743,7 @@ index 0a9b567b..99efc4b8 100644
  const Common::String *Project::findNameOfLabel(const Label &label) const {
  	for (const LabelSuperGroup &superGroup : _labelSuperGroups) {
  		if (superGroup.superGroupID == label.superGroupID) {
-@@ -8380,19 +8671,21 @@ Common::SharedPtr<Modifier> Project::loadModifierObject(ModifierLoaderContext &l
+@@ -8380,19 +8684,21 @@ Common::SharedPtr<Modifier> Project::loadModifierObject(ModifierLoaderContext &l
  
  		const IPlugInModifierFactory *factory = _plugInRegistry.findPlugInModifierFactory(plugInData.modifierName);
  		if (!factory)
@@ -4069,7 +4769,7 @@ index 0a9b567b..99efc4b8 100644
  	assert(modifier->getModifierFlags().flagsWereLoaded);
  
  	uint32 guid = modifier->getStaticGUID();
-@@ -8980,12 +9273,12 @@ VisualElementRenderProperties &VisualElementRenderProperties::operator=(const Vi
+@@ -8980,12 +9286,12 @@ VisualElementRenderProperties &VisualElementRenderProperties::operator=(const Vi
  }
  
  VisualElement::VisualElement()
@@ -4084,7 +4784,7 @@ index 0a9b567b..99efc4b8 100644
  	, _rect(other._rect), _cachedAbsoluteOrigin(other._cachedAbsoluteOrigin), _layer(other._layer), _topLeftBevelShading(other._topLeftBevelShading)
  	, _bottomRightBevelShading(other._bottomRightBevelShading), _interiorShading(other._interiorShading), _bevelSize(other._bevelSize)
  	, _dragProps(nullptr), _renderProps(other._renderProps), _primaryGraphicModifier(nullptr), _transitionProps(other._transitionProps)
-@@ -9008,6 +9301,10 @@ bool VisualElement::isVisibleByDefault() const {
+@@ -9008,6 +9314,10 @@ bool VisualElement::isVisibleByDefault() const {
  	return _visibleByDefault;
  }
  
@@ -4095,7 +4795,7 @@ index 0a9b567b..99efc4b8 100644
  void VisualElement::setVisible(Runtime *runtime, bool visible) {
  	if (_visible != visible) {
  		runtime->setSceneGraphDirty();
-@@ -9043,6 +9340,9 @@ CORO_BEGIN_DEFINITION(VisualElement::VisualElementConsumeCommandCoroutine)
+@@ -9043,6 +9353,9 @@ CORO_BEGIN_DEFINITION(VisualElement::VisualElementConsumeCommandCoroutine)
  
  	CORO_BEGIN_FUNCTION
  		CORO_IF(Event(EventIDs::kElementShow, 0).respondsTo(params->msg->getEvent()))
@@ -4105,7 +4805,7 @@ index 0a9b567b..99efc4b8 100644
  			if (!params->self->_visible) {
  				params->self->_visible = true;
  				params->runtime->setSceneGraphDirty();
-@@ -9055,6 +9355,9 @@ CORO_BEGIN_DEFINITION(VisualElement::VisualElementConsumeCommandCoroutine)
+@@ -9055,6 +9368,9 @@ CORO_BEGIN_DEFINITION(VisualElement::VisualElementConsumeCommandCoroutine)
  
  			CORO_RETURN;
  		CORO_ELSE_IF(Event(EventIDs::kElementHide, 0).respondsTo(params->msg->getEvent()))
@@ -4115,7 +4815,7 @@ index 0a9b567b..99efc4b8 100644
  			if (params->self->_visible) {
  				params->self->_visible = false;
  
-@@ -9069,6 +9372,52 @@ CORO_BEGIN_DEFINITION(VisualElement::VisualElementConsumeCommandCoroutine)
+@@ -9069,6 +9385,52 @@ CORO_BEGIN_DEFINITION(VisualElement::VisualElementConsumeCommandCoroutine)
  
  			CORO_CALL(Runtime::SendMessageOnVThreadCoroutine, params->runtime, dispatch);
  
@@ -4168,7 +4868,7 @@ index 0a9b567b..99efc4b8 100644
  			CORO_RETURN;
  		CORO_END_IF
  
-@@ -9275,6 +9624,9 @@ MiniscriptInstructionOutcome VisualElement::writeRefAttribute(MiniscriptThread *
+@@ -9275,6 +9637,9 @@ MiniscriptInstructionOutcome VisualElement::writeRefAttribute(MiniscriptThread *
  	} else if (attrib == "position") {
  		DynamicValueWriteOrRefAttribFuncHelper<VisualElement, &VisualElement::scriptSetPosition, &VisualElement::scriptWriteRefPositionAttribute>::create(this, writeProxy);
  		return kMiniscriptInstructionOutcomeContinue;
@@ -4178,7 +4878,23 @@ index 0a9b567b..99efc4b8 100644
  	} else if (attrib == "size") {
  		DynamicValueWriteOrRefAttribFuncHelper<VisualElement, &VisualElement::scriptSetSize, &VisualElement::scriptWriteRefSizeAttribute>::create(this, writeProxy);
  		return kMiniscriptInstructionOutcomeContinue;
-@@ -9450,6 +9802,15 @@ const Common::SharedPtr<Palette> &VisualElement::getPalette() const {
+@@ -9432,6 +9797,15 @@ bool VisualElement::needsRender() const {
+ 	if (_renderProps.isDirty() || _prevRect != _rect || _contentsDirty)
+ 		return true;
+ 
++	for (const Common::SharedPtr<Modifier> &mod : _modifiers) {
++		Common::Point rotSize, rotAxis;
++		double rotAngle = 0.0;
++		if (mod->getRotatorProperties(getRuntime(), rotSize, rotAxis, rotAngle)) {
++			if (getRuntime()->isSceneGraphDirty())
++				return true;
++		}
++	}
++
+ 	return false;
+ }
+ 
+@@ -9450,6 +9824,15 @@ const Common::SharedPtr<Palette> &VisualElement::getPalette() const {
  	return _palette;
  }
  
@@ -4194,7 +4910,7 @@ index 0a9b567b..99efc4b8 100644
  void VisualElement::visitInternalReferences(IStructuralReferenceVisitor *visitor) {
  	Element::visitInternalReferences(visitor);
  }
-@@ -9473,7 +9834,6 @@ void VisualElement::debugInspect(IDebugInspectionReport *report) const {
+@@ -9473,7 +9856,6 @@ void VisualElement::debugInspect(IDebugInspectionReport *report) const {
  #endif
  
  MiniscriptInstructionOutcome VisualElement::scriptSetVisibility(MiniscriptThread *thread, const DynamicValue &result) {
@@ -4202,7 +4918,7 @@ index 0a9b567b..99efc4b8 100644
  	if (result.getType() == DynamicValueTypes::kBoolean) {
  		const bool targetValue = result.getBool();
  
-@@ -9484,7 +9844,16 @@ MiniscriptInstructionOutcome VisualElement::scriptSetVisibility(MiniscriptThread
+@@ -9484,7 +9866,16 @@ MiniscriptInstructionOutcome VisualElement::scriptSetVisibility(MiniscriptThread
  
  		if (_visible != targetValue) {
  			_visible = targetValue;
@@ -4219,7 +4935,7 @@ index 0a9b567b..99efc4b8 100644
  		}
  		return kMiniscriptInstructionOutcomeContinue;
  	}
-@@ -9499,6 +9868,7 @@ bool VisualElement::loadCommon(const Common::String &name, uint32 guid, const Da
+@@ -9499,6 +9890,7 @@ bool VisualElement::loadCommon(const Common::String &name, uint32 guid, const Da
  	_name = name;
  	_guid = guid;
  	_visibleByDefault = ((elementFlags & Data::ElementFlags::kHidden) == 0);	// Element isn't actually flagged as visible until after Scene Changed, when Show commands are fired
@@ -4227,7 +4943,7 @@ index 0a9b567b..99efc4b8 100644
  	_directToScreen = ((elementFlags & Data::ElementFlags::kNotDirectToScreen) == 0);
  	_streamLocator = streamLocator;
  	_sectionID = sectionID;
-@@ -9571,6 +9941,63 @@ MiniscriptInstructionOutcome VisualElement::scriptSetPositionY(MiniscriptThread
+@@ -9571,6 +9963,63 @@ MiniscriptInstructionOutcome VisualElement::scriptSetPositionY(MiniscriptThread
  	return kMiniscriptInstructionOutcomeContinue;
  }
  
@@ -4291,7 +5007,7 @@ index 0a9b567b..99efc4b8 100644
  MiniscriptInstructionOutcome VisualElement::scriptSetCenterPosition(MiniscriptThread *thread, const DynamicValue &value) {
  	if (value.getType() == DynamicValueTypes::kPoint) {
  		const Common::Point destPoint = value.getPoint();
-@@ -9695,6 +10122,18 @@ MiniscriptInstructionOutcome VisualElement::scriptWriteRefPositionAttribute(Mini
+@@ -9695,6 +10144,18 @@ MiniscriptInstructionOutcome VisualElement::scriptWriteRefPositionAttribute(Mini
  	return kMiniscriptInstructionOutcomeFailed;
  }
  
@@ -4310,7 +5026,7 @@ index 0a9b567b..99efc4b8 100644
  MiniscriptInstructionOutcome VisualElement::scriptWriteRefCenterPositionAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib) {
  	if (attrib == "x") {
  		DynamicValueWriteFuncHelper<VisualElement, &VisualElement::scriptSetCenterPositionX, true>::create(this, writeProxy);
-@@ -10104,12 +10543,45 @@ bool Modifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, con
+@@ -10104,12 +10565,45 @@ bool Modifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, con
  }
  
  MiniscriptInstructionOutcome Modifier::writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib) {
@@ -4360,8 +5076,19 @@ index 0a9b567b..99efc4b8 100644
  	}
  
  	return RuntimeObject::writeRefAttribute(thread, writeProxy, attrib);
+@@ -10149,6 +10643,10 @@ bool Modifier::isKeyboardMessenger() const {
+ 	return false;
+ }
+ 
++bool Modifier::getRotatorProperties(Runtime *runtime, Common::Point &outSize, Common::Point &outAxisOffset, double &outAngle) {
++	return false;
++}
++
+ Common::SharedPtr<ModifierSaveLoad> Modifier::getSaveLoad(Runtime *runtime) {
+ 	return nullptr;
+ }
 diff --git a/engines/mtropolis/runtime.h b/engines/mtropolis/runtime.h
-index fef072a2..de57a636 100644
+index fef072a2..c96a3f17 100644
 --- a/engines/mtropolis/runtime.h
 +++ b/engines/mtropolis/runtime.h
 @@ -774,6 +774,7 @@ struct DynamicList {
@@ -4372,7 +5099,16 @@ index fef072a2..de57a636 100644
  	void deleteAtIndex(size_t index);
  	void truncateToSize(size_t sz);
  	void expandToMinimumSize(size_t sz);
-@@ -1721,6 +1722,7 @@ public:
+@@ -1331,6 +1332,8 @@ struct LowLevelSceneStateTransitionAction {
+ 		kAutoResetCursor,
+ 		kHideAllElements,
+ 		kShowDefaultVisibleElements,
++		kUpdateActiveMainScene,
++		kUpdateActiveSharedScene,
+ 	};
+ 
+ 	explicit LowLevelSceneStateTransitionAction(const Common::SharedPtr<MessageDispatch> &msg);
+@@ -1721,6 +1724,7 @@ public:
  	void queueCloneObject(const Common::WeakPtr<RuntimeObject> &obj);
  	void queueKillObject(const Common::WeakPtr<RuntimeObject> &obj);
  	void queueChangeObjectParent(const Common::WeakPtr<RuntimeObject> &obj, const Common::WeakPtr<RuntimeObject> &newParent);
@@ -4380,7 +5116,16 @@ index fef072a2..de57a636 100644
  
  	void hotLoadScene(Structural *structural);
  
-@@ -1909,7 +1911,6 @@ private:
+@@ -1839,7 +1843,7 @@ private:
+ 	void executeHighLevelSceneReturn();
+ 	void executeHighLevelSceneTransition(const HighLevelSceneTransition &transition);
+ 	void executeCompleteTransitionToScene(const Common::SharedPtr<Structural> &scene);
+-	void executeSharedScenePostSceneChangeActions();
++	void executeSharedScenePostSceneChangeActions(const Common::SharedPtr<Structural> &targetScene, const Common::SharedPtr<Structural> &targetSharedScene);
+ 	void executeSceneChangeRecursiveVisibilityChange(Structural *structural, bool showing);
+ 	void executeChangeObjectParent(RuntimeObject *object, RuntimeObject *newParent);
+ 	void executeCloneObject(RuntimeObject *object);
+@@ -1909,7 +1913,6 @@ private:
  	Common::Array<LowLevelSceneStateTransitionAction> _pendingLowLevelTransitions;
  	Common::Array<Common::WeakPtr<RuntimeObject> > _pendingKills;
  	Common::Array<Common::WeakPtr<RuntimeObject> > _pendingClones;
@@ -4388,7 +5133,7 @@ index fef072a2..de57a636 100644
  	Common::Array<Common::WeakPtr<Structural> > _pendingShowClonedObject;
  	Common::Array<ObjectParentChange> _pendingParentChanges;
  	uint _pendingSceneReturnCount;
-@@ -2135,6 +2136,8 @@ public:
+@@ -2135,6 +2138,8 @@ public:
  	bool readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) override;
  	MiniscriptInstructionOutcome writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) override;
  
@@ -4397,7 +5142,7 @@ index fef072a2..de57a636 100644
  private:
  	MiniscriptInstructionOutcome setCurrentScene(MiniscriptThread *thread, const DynamicValue &value);
  	MiniscriptInstructionOutcome setRefreshCursor(MiniscriptThread *thread, const DynamicValue &value);
-@@ -2146,6 +2149,7 @@ private:
+@@ -2146,6 +2151,7 @@ private:
  	bool _gameMode;
  	bool _combineRedraws;
  	bool _postponeRedraws;
@@ -4405,7 +5150,7 @@ index fef072a2..de57a636 100644
  };
  
  class AssetManagerInterface : public RuntimeObject {
-@@ -2211,9 +2215,11 @@ public:
+@@ -2211,9 +2217,11 @@ public:
  	bool readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) override;
  	bool readAttributeIndexed(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib, const DynamicValue &index) override;
  	MiniscriptInstructionOutcome writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) override;
@@ -4417,7 +5162,7 @@ index fef072a2..de57a636 100644
  	void removeAllChildren();
  	void removeAllModifiers();
  	void removeChild(Structural *child);
-@@ -2498,6 +2504,7 @@ public:
+@@ -2498,6 +2506,7 @@ public:
  	void openSegmentStream(int segmentIndex);
  	void closeSegmentStream(int segmentIndex);
  	Common::SeekableReadStream *getStreamForSegment(int segmentIndex);
@@ -4425,7 +5170,7 @@ index fef072a2..de57a636 100644
  
  	const Common::String *findNameOfLabel(const Label &label) const;
  
-@@ -2516,6 +2523,7 @@ public:
+@@ -2516,6 +2525,7 @@ public:
  
  	RuntimeVersion getRuntimeVersion() const;
  	ProjectPlatform getPlatform() const;
@@ -4433,7 +5178,7 @@ index fef072a2..de57a636 100644
  
  	void visitInternalReferences(IStructuralReferenceVisitor *visitor) override;
  	Common::SharedPtr<Structural> shallowClone() const override;
-@@ -2636,6 +2644,7 @@ private:
+@@ -2636,6 +2646,7 @@ private:
  	SubtitleTables _subtitles;
  
  	ProjectPlatform _platform;
@@ -4441,7 +5186,7 @@ index fef072a2..de57a636 100644
  
  	Common::Archive *_rootArchive;
  	Common::Path _projectRootDir;
-@@ -2830,6 +2839,10 @@ public:
+@@ -2830,6 +2841,10 @@ public:
  
  	bool isVisual() const override;
  	virtual bool isTextLabel() const;
@@ -4452,7 +5197,7 @@ index fef072a2..de57a636 100644
  
  	struct VisualElementConsumeCommandCoroutine {
  		CORO_DEFINE_RETURN_TYPE(void);
-@@ -2843,6 +2856,7 @@ public:
+@@ -2843,6 +2858,7 @@ public:
  
  	bool isVisible() const;
  	bool isVisibleByDefault() const;
@@ -4460,7 +5205,7 @@ index fef072a2..de57a636 100644
  	void setVisible(Runtime *runtime, bool visible);
  
  	bool isDirectToScreen() const;
-@@ -2901,6 +2915,9 @@ public:
+@@ -2901,6 +2917,9 @@ public:
  	void setPalette(const Common::SharedPtr<Palette> &palette);
  	const Common::SharedPtr<Palette> &getPalette() const;
  
@@ -4470,7 +5215,7 @@ index fef072a2..de57a636 100644
  	void visitInternalReferences(IStructuralReferenceVisitor *visitor) override;
  
  	void pushVisibilityChangeTask(Runtime *runtime, bool desiredVisibility);
-@@ -2918,6 +2935,9 @@ protected:
+@@ -2918,6 +2937,9 @@ protected:
  	MiniscriptInstructionOutcome scriptSetPosition(MiniscriptThread *thread, const DynamicValue &dest);
  	MiniscriptInstructionOutcome scriptSetPositionX(MiniscriptThread *thread, const DynamicValue &dest);
  	MiniscriptInstructionOutcome scriptSetPositionY(MiniscriptThread *thread, const DynamicValue &dest);
@@ -4480,7 +5225,7 @@ index fef072a2..de57a636 100644
  	MiniscriptInstructionOutcome scriptSetCenterPosition(MiniscriptThread *thread, const DynamicValue &dest);
  	MiniscriptInstructionOutcome scriptSetCenterPositionX(MiniscriptThread *thread, const DynamicValue &dest);
  	MiniscriptInstructionOutcome scriptSetCenterPositionY(MiniscriptThread *thread, const DynamicValue &dest);
-@@ -2928,6 +2948,7 @@ protected:
+@@ -2928,6 +2950,7 @@ protected:
  	MiniscriptInstructionOutcome scriptSetLayer(MiniscriptThread *thread, const DynamicValue &dest);
  
  	MiniscriptInstructionOutcome scriptWriteRefPositionAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib);
@@ -4488,7 +5233,7 @@ index fef072a2..de57a636 100644
  	MiniscriptInstructionOutcome scriptWriteRefSizeAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib);
  	MiniscriptInstructionOutcome scriptWriteRefCenterPositionAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib);
  
-@@ -2967,6 +2988,7 @@ protected:
+@@ -2967,6 +2990,7 @@ protected:
  	bool _directToScreen;
  	bool _visible;
  	bool _visibleByDefault;
@@ -4496,7 +5241,7 @@ index fef072a2..de57a636 100644
  	Common::Rect _rect;
  	Common::Point _cachedAbsoluteOrigin;
  	uint16 _layer;
-@@ -2986,6 +3008,7 @@ protected:
+@@ -2986,6 +3010,7 @@ protected:
  	VisualElementTransitionProperties _transitionProps;
  
  	Common::SharedPtr<Palette> _palette;
@@ -4504,7 +5249,15 @@ index fef072a2..de57a636 100644
  
  	Common::Rect _prevRect;
  	bool _contentsDirty;
-@@ -3128,6 +3151,7 @@ public:
+@@ -3047,6 +3072,7 @@ public:
+ 	virtual bool isBehavior() const;
+ 	virtual bool isCompoundVariable() const;
+ 	virtual bool isKeyboardMessenger() const;
++	virtual bool getRotatorProperties(Runtime *runtime, Common::Point &outSize, Common::Point &outAxisOffset, double &outAngle);
+ 	virtual Common::SharedPtr<ModifierSaveLoad> getSaveLoad(Runtime *runtime);
+ 
+ 	bool isModifier() const override;
+@@ -3128,6 +3154,7 @@ public:
  
  	virtual bool isVariable() const override;
  	virtual bool isListVariable() const;

@@ -36,11 +36,27 @@ jobs:
           gh release download v1.0.0-preservation --repo panlybero/uncle-albert-magical-album-greek --pattern "albert_game_data.zip" -D /tmp/game_download
           echo "Extracting game assets into web/data/albert..."
           unzip -q /tmp/game_download/albert_game_data.zip -d web/data/albert
+          # French edition (optional): albert_game_data_fr.zip is built from the
+          # French installer with tools/make_french_game_data.py. Without it the
+          # site deploys the Greek edition only.
+          if gh release view v1.0.0-preservation --repo panlybero/uncle-albert-magical-album-greek --json assets --jq '.assets[].name' | grep -qx "albert_game_data_fr.zip"; then
+            echo "Downloading French game data..."
+            mkdir -p web/data/albert_fr
+            gh release download v1.0.0-preservation --repo panlybero/uncle-albert-magical-album-greek --pattern "albert_game_data_fr.zip" -D /tmp/game_download
+            unzip -q /tmp/game_download/albert_game_data_fr.zip -d web/data/albert_fr
+          else
+            echo "albert_game_data_fr.zip not in release; skipping French edition."
+          fi
           echo "Generating HTTP filesystem indexes..."
           python3 tools/build-make_http_index.py web/data
           echo "Splitting 359 MB album_gr2.MPX into 16 MB CDN shards for GitHub Pages..."
           split -b 16777216 -d -a 2 web/data/albert/ALBUM/DATA/album_gr2.MPX web/data/albert/ALBUM/DATA/album_gr2.MPX.part
           rm -f web/data/albert/ALBUM/DATA/album_gr2.MPX
+          if [ -f web/data/albert_fr/ALBUM/DATA/album422.MPX ]; then
+            echo "Splitting 293 MB album422.MPX into 16 MB CDN shards..."
+            split -b 16777216 -d -a 2 web/data/albert_fr/ALBUM/DATA/album422.MPX web/data/albert_fr/ALBUM/DATA/album422.MPX.part
+            rm -f web/data/albert_fr/ALBUM/DATA/album422.MPX
+          fi
           rm -rf /tmp/game_download
 
       - name: Upload Pages artifact

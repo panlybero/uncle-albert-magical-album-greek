@@ -1,0 +1,328 @@
+diff --git a/backends/fs/emscripten/emscripten-fs-factory.cpp b/backends/fs/emscripten/emscripten-fs-factory.cpp
+index 19177980f8..74b710ddba 100644
+--- a/backends/fs/emscripten/emscripten-fs-factory.cpp
++++ b/backends/fs/emscripten/emscripten-fs-factory.cpp
+@@ -45,6 +45,16 @@ EM_ASYNC_JS(void, _initSettings, (const char *pathPtr), {
+ 		await new Promise((resolve, reject) => {
+ 			FS.syncfs(true, (err) => err ? reject(err) : resolve());
+ 		});
++
++		// Create directories the page asks for (e.g. a per-edition --savepath),
++		// because command-line path options must exist before they are parsed.
++		if (Array.isArray(Module['scummvmEnsureDirs'])) {
++			for (const dir of Module['scummvmEnsureDirs']) {
++				if (!FS.analyzePath(dir).exists) {
++					FS.mkdirTree(dir);
++				}
++			}
++		}
+ 		
+ 		// Check if settings file exists and download if needed
+ 		if (!FS.analyzePath(settingsPath).exists) {
+diff --git a/engines/mtropolis/detection_tables.h b/engines/mtropolis/detection_tables.h
+index 5005eb5e2e..27e91f5f48 100644
+--- a/engines/mtropolis/detection_tables.h
++++ b/engines/mtropolis/detection_tables.h
+@@ -632,9 +632,8 @@ static const MTropolisGameDescription gameDescriptions[] = {
+ 	  // Published by Emme, 1998
+ 		{
+ 			"albert1",
+-			MetaEngineDetection::GAME_NOT_IMPLEMENTED,
++			"",
+ 			{
+-				{"MTPLAY95.EXE", 0, "0e513dac9d2a0d7cfcdc670cab2a9bda", 757760},
+ 				{"album421.MPL", 0, "2f3cc30f13ecc99e8e4818353cef1d34", 18879823},
+ 				// {"album422.MPX", 0, "132db6e709ff40b49e5c702c6d14bd95", 293417240},
+ 				// { "BASIC.X95",    0, "a1b474e90cc285bfdcfa87355f890b9e", 242688 },
+@@ -646,7 +645,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
+ 			},
+ 			Common::FR_FRA,
+ 			Common::kPlatformWindows,
+-			ADGF_UNSUPPORTED,
++			ADGF_NO_FLAGS,
+ 			GUIO0()
+ 		},
+ 		GID_ALBERT1,
+diff --git a/engines/mtropolis/elements.cpp b/engines/mtropolis/elements.cpp
+index 01011eac1e..09a5859af7 100644
+--- a/engines/mtropolis/elements.cpp
++++ b/engines/mtropolis/elements.cpp
+@@ -2398,7 +2398,7 @@ TextLabelElement::TextLabelElement()
+ TextLabelElement::TextLabelElement(const TextLabelElement &other)
+ 	: VisualElement(other), _cacheBitmap(other._cacheBitmap), _needsRender(other._needsRender)
+ 	, _editable(other._editable), _selected(other._selected), _isBitmap(other._isBitmap)
+-	, _assetID(other._assetID), _text(other._text), _macFontID(other._macFontID), _fontFamilyName(other._fontFamilyName)
++	, _assetID(other._assetID), _text(other._text), _calculatedFieldTemplate(other._calculatedFieldTemplate), _macFontID(other._macFontID), _fontFamilyName(other._fontFamilyName)
+ 	, _size(other._size), _alignment(other._alignment), _styleFlags(other._styleFlags), _macFormattingSpans(other._macFormattingSpans)
+ 	, _renderedText(nullptr) {
+ 
+@@ -2608,6 +2608,11 @@ void TextLabelElement::onKeyboardEvent(Runtime *runtime, const KeyboardInputEven
+ 		}
+ 	} else if (ks.keycode != Common::KEYCODE_RETURN && ks.keycode != Common::KEYCODE_KP_ENTER
+ 		&& ks.keycode != Common::KEYCODE_ESCAPE && ks.keycode != Common::KEYCODE_TAB) {
++		// Ignore auto-repeat for characters: the web page sends each typed character as a
++		// synthetic key down/up pair, and a missed key up would otherwise repeat the letter.
++		if (keyEvt.isRepeat())
++			return;
++
+ 		uint8 ch = 0;
+ 		if (ks.ascii >= 32 && ks.ascii <= 255) {
+ 			ch = static_cast<uint8>(ks.ascii);
+@@ -2718,10 +2723,129 @@ void TextLabelElement::activate() {
+ 		_needsRender = true;
+ 		_isBitmap = false;
+ 		_text = textAsset->getString();
++		_calculatedFieldTemplate = _text;
+ 		_macFormattingSpans = textAsset->getMacFormattingSpans();
++
++		// Labels show their calculated fields filled in from the start; some are never
++		// sent "Update Calculated Fields" at all. This also covers an update command
++		// that arrived before the asset text was loaded.
++		updateCalculatedFields();
+ 	}
+ }
+ 
++VThreadState TextLabelElement::asyncConsumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
++	if (Event(EventIDs::kElementUpdatedCalculated, 0).respondsTo(msg->getEvent())) {
++		updateCalculatedFields();
++		return kVThreadReturn;
++	}
++
++	return VisualElement::asyncConsumeCommand(runtime, msg);
++}
++
++// "Update Calculated Fields" replaces each "<name>" in the label's text with the
++// current value of the variable called "name", searched for on the label and then
++// on its parents. Unknown names are left as they are.
++void TextLabelElement::updateCalculatedFields() {
++	if (_isBitmap)
++		return;
++
++	const Common::String &tmpl = _calculatedFieldTemplate;
++	Common::String result;
++	bool changed = false;
++
++	uint32 pos = 0;
++	while (pos < tmpl.size()) {
++		size_t open = tmpl.find('<', pos);
++		if (open == Common::String::npos) {
++			result += tmpl.substr(pos);
++			break;
++		}
++
++		size_t close = tmpl.find('>', open + 1);
++		if (close == Common::String::npos) {
++			result += tmpl.substr(pos);
++			break;
++		}
++
++		result += tmpl.substr(pos, open - pos);
++
++		Common::String fieldName = tmpl.substr(open + 1, close - open - 1);
++		VariableModifier *var = findVariableForCalculatedField(fieldName);
++		debug(2, "Text label '%s': calculated field '%s' %s", getName().c_str(), fieldName.c_str(), var ? "resolved" : "not found");
++		if (var) {
++			DynamicValue value;
++			var->varGetValue(value);
++
++			switch (value.getType()) {
++			case DynamicValueTypes::kString:
++				result += value.getString();
++				break;
++			case DynamicValueTypes::kInteger:
++				result += Common::String::format("%i", static_cast<int>(value.getInt()));
++				break;
++			case DynamicValueTypes::kFloat:
++				result += Common::String::format("%g", value.getFloat());
++				break;
++			case DynamicValueTypes::kBoolean:
++				result += value.getBool() ? "true" : "false";
++				break;
++			default:
++				warning("Calculated field '%s' in text label '%s' has an unsupported value type", fieldName.c_str(), getName().c_str());
++				break;
++			}
++			changed = true;
++		} else {
++			result += tmpl.substr(open, close - open + 1);
++		}
++
++		pos = close + 1;
++	}
++
++	if (!changed)
++		return;
++
++	debug(2, "Text label '%s': calculated text '%s'", getName().c_str(), result.c_str());
++	_text = result;
++	_needsRender = true;
++	_contentsDirty = true;
++	_macFormattingSpans.clear();
++}
++
++static VariableModifier *findVariableInModifierContainer(const IModifierContainer *container, const Common::String &name) {
++	for (const Common::SharedPtr<Modifier> &modifier : container->getModifiers()) {
++		if (modifier->isVariable() && modifier->getName().equalsIgnoreCase(name))
++			return static_cast<VariableModifier *>(modifier.get());
++	}
++
++	// Variables kept inside behaviors are visible to the element too
++	for (const Common::SharedPtr<Modifier> &modifier : container->getModifiers()) {
++		if (!modifier->isBehavior())
++			continue;
++
++		IModifierContainer *childContainer = modifier->getChildContainer();
++		if (childContainer) {
++			if (VariableModifier *var = findVariableInModifierContainer(childContainer, name))
++				return var;
++		}
++	}
++
++	return nullptr;
++}
++
++VariableModifier *TextLabelElement::findVariableForCalculatedField(const Common::String &name) const {
++	for (const Structural *structural = this; structural; structural = structural->getParent()) {
++		if (VariableModifier *var = findVariableInModifierContainer(structural, name))
++			return var;
++	}
++
++	// The shared scene stays loaded beside every page, and holds page-wide variables
++	Common::SharedPtr<Structural> sharedScene = getRuntime()->getActiveSharedScene();
++	if (sharedScene)
++		return findVariableInModifierContainer(sharedScene.get(), name);
++
++	return nullptr;
++}
++
+ void TextLabelElement::deactivate() {
+ 	if (_keySignaller) {
+ 		_keySignaller->removeReceiver(this);
+@@ -2954,6 +3078,7 @@ MiniscriptInstructionOutcome TextLabelElement::scriptSetText(MiniscriptThread *t
+ 	}
+ 
+ 	_text = value.getString();
++	_calculatedFieldTemplate = _text;
+ 	_needsRender = true;
+ 	_isBitmap = false;
+ 	_contentsDirty = true;
+diff --git a/engines/mtropolis/elements.h b/engines/mtropolis/elements.h
+index 54242641cc..b5fc9341a2 100644
+--- a/engines/mtropolis/elements.h
++++ b/engines/mtropolis/elements.h
+@@ -361,6 +361,8 @@ public:
+ 
+ 	void render(Window *window) override;
+ 
++	VThreadState asyncConsumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
++
+ 	void setTextStyle(uint16 macFontID, const Common::String &fontFamilyName, uint size, TextAlignment alignment, const TextStyleFlags &styleFlags);
+ 
+ 	Graphics::FontManager::FontUsage getDefaultUsageForMacFont(uint16 macFontID, uint size);
+@@ -389,6 +391,9 @@ private:
+ 	bool findLineRange(size_t lineNum, uint32 &outStartPos, uint32 &outEndPos) const;
+ 	size_t countLines() const;
+ 
++	void updateCalculatedFields();
++	VariableModifier *findVariableForCalculatedField(const Common::String &name) const;
++
+ 	bool _cacheBitmap;
+ 	bool _needsRender;
+ 	bool _editable;
+@@ -398,6 +403,7 @@ private:
+ 	uint32 _assetID;
+ 
+ 	Common::String _text;
++	Common::String _calculatedFieldTemplate;	// Text with "<variable>" fields, before substitution
+ 	uint16 _macFontID;
+ 	Common::String _fontFamilyName;
+ 	uint _size;
+diff --git a/engines/mtropolis/runtime.cpp b/engines/mtropolis/runtime.cpp
+index a9fd85a86b..dca8c2ab35 100644
+--- a/engines/mtropolis/runtime.cpp
++++ b/engines/mtropolis/runtime.cpp
+@@ -7260,10 +7260,45 @@ void Runtime::setVolume(double volume) {
+ 	mixer->setVolumeForSoundType(Audio::Mixer::kSpeechSoundType, static_cast<int>(volume * Audio::Mixer::kMaxMixerVolume));
+ }
+ 
++// Uncle Albert's Magical Album: the French intro scene ('film', 0x19ed77) leaves only
++// when its movie (0x19d81b) sends "At Last Cel"; unlike the Greek release, nothing in
++// it responds to the mouse. Send that event early so Escape or a click skips the film
++// through the game's own end-of-movie messenger.
++bool Runtime::skipAlbertIntroMovie() {
++	if (!_activeMainScene || _activeMainScene->getStaticGUID() != 0x0019ed77 || !_project || _project->getLanguage() != Common::FR_FRA) {
++		_albertIntroSkipScene = nullptr;
++		return false;
++	}
++
++	if (_albertIntroSkipScene == _activeMainScene.get())
++		return true;
++
++	Common::Array<Structural *> pending;
++	pending.push_back(_activeMainScene.get());
++	while (!pending.empty()) {
++		Structural *structural = pending.back();
++		pending.pop_back();
++
++		if (structural->getStaticGUID() == 0x0019d81b) {
++			_albertIntroSkipScene = _activeMainScene.get();
++			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kAtLastCel, 0), structural, true, true);
++			return true;
++		}
++
++		for (const Common::SharedPtr<Structural> &child : structural->getChildren())
++			pending.push_back(child.get());
++	}
++
++	return false;
++}
++
+ void Runtime::onMouseDown(int32 x, int32 y, Actions::MouseButton mButton) {
+ 	_realMousePosition.x = x;
+ 	_realMousePosition.y = y;
+ 
++	if (skipAlbertIntroMovie())
++		return;
++
+ 	Common::SharedPtr<Window> focusWindow = _mouseFocusWindow.lock();
+ 	if (!focusWindow) {
+ 		focusWindow = findTopWindow(x, y);
+@@ -7319,6 +7354,8 @@ void Runtime::onMouseUp(int32 x, int32 y, Actions::MouseButton mButton) {
+ 
+ void Runtime::onKeyboardEvent(const Common::EventType evtType, bool repeat, const Common::KeyState &keyEvt) {
+ 	if (evtType == Common::EVENT_KEYDOWN && keyEvt.keycode == Common::KEYCODE_ESCAPE && _activeMainScene && _activeMainScene->getStaticGUID() == 0x0019ed77) {
++		if (skipAlbertIntroMovie())
++			return;
+ 		onMouseDown(320, 240, Actions::kMouseButtonLeft);
+ 		onMouseUp(320, 240, Actions::kMouseButtonLeft);
+ 		return;
+@@ -7535,7 +7572,8 @@ void Runtime::checkCollisions(ICollider *optRestrictToCollider) {
+ 		for (size_t oldIndex = 0; oldIndex < oldCollidingElements.size();) {
+ 			Common::SharedPtr<VisualElement> oldColElement = oldCollidingElements[oldIndex].lock();
+ 			if (oldColElement.get() == nullptr) {
+-				collidingElements.remove_at(oldIndex);
++				// The element is gone (e.g. a killed clone): drop it from the old list
++				oldCollidingElements.remove_at(oldIndex);
+ 				continue;
+ 			}
+ 
+diff --git a/engines/mtropolis/runtime.h b/engines/mtropolis/runtime.h
+index 43b7576408..67b0018a56 100644
+--- a/engines/mtropolis/runtime.h
++++ b/engines/mtropolis/runtime.h
+@@ -1858,6 +1858,7 @@ private:
+ 	static void recursiveFindMouseCollision(Structural *&bestResult, int32 &bestLayer, int32 &bestStackHeight, bool &bestDirect, Structural *candidate, int32 stackHeight, int32 relativeX, int32 relativeY, MouseInteractivityTestType testType);
+ 
+ 	void queueEventAsLowLevelSceneStateTransitionAction(const Event &evt, Structural *root, bool cascade, bool relay);
++	bool skipAlbertIntroMovie();
+ 
+ 	void loadScene(const Common::SharedPtr<Structural> &scene);
+ 
+@@ -1919,6 +1920,7 @@ private:
+ 	Common::Array<HighLevelSceneTransition> _pendingSceneTransitions;
+ 	Common::Array<SceneStackEntry> _sceneStack;
+ 	Common::SharedPtr<Structural> _activeMainScene;
++	Structural *_albertIntroSkipScene = nullptr;
+ 	Common::SharedPtr<Structural> _activeSharedScene;
+ 	Common::Array<SceneReturnListEntry> _sceneReturnList;
+ 

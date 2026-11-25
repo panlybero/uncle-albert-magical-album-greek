@@ -55,6 +55,32 @@ You can play the complete Greek edition directly in any modern browser (Chrome, 
 
 ---
 
+## 🇫🇷 French Edition (*L'Album secret de l'oncle Ernest*, Windows)
+
+The web player can also run the original French Windows release (`album421.MPL` / `album422.MPX`). Choose the language with the selector in the top bar, or open the page with `?lang=fr`. Each edition keeps its own data folder (`/data/albert` or `/data/albert_fr`) and its own save folder, so albums from one language never appear in the other.
+
+### Game data
+
+The French files are not stored in this repository. Build `albert_game_data_fr.zip` from the French installer:
+
+```bash
+sudo apt install innoextract
+python3 tools/make_french_game_data.py setup-02763-L_Album_secret_de_l_oncle_Ernest-PCWin.exe
+```
+
+The script checks the installer, unpacks it with `innoextract`, verifies that `album421.MPL` and `album422.MPX` match ScummVM's French `albert1` entry, and writes the needed files under `ALBUM/DATA/` (the same layout as the Greek zip). Attach the zip to the `v1.0.0-preservation` release: the deploy workflow then adds the French edition, and skips it when the zip is absent. The language selector only offers editions whose data was deployed.
+
+### Engine changes (`patches/scummvm-french-albert.patch`, applied after the Greek patch)
+
+1. Enables the French `albert1` detection entry and drops the `MTPLAY95.EXE` checksum, because known copies ship a patched player.
+2. Implements mTropolis text-label *calculated fields*: a label text such as `<nom_page>` or `<trad_texte>` shows the value of the variable with that name, filled in when the label activates and on the "Update Calculated Fields" command (event 219). Before this, page names, tooltips and the album-selection instructions showed the raw `<...>` placeholders.
+3. Lets Escape, the skip button or a click skip the French intro film. In the French release the `film` scene only leaves when the movie reaches its last frame, so the event is sent early.
+4. Ignores key auto-repeat when typing a name, so one key press adds one letter.
+5. Fixes a crash in `Runtime::checkCollisions` (`Assertion failed: idx < _size ... remove_at`): an expired element was removed from the wrong list.
+6. Emscripten: creates folders listed in `Module.scummvmEnsureDirs` after mounting IDBFS, so the page can pass a per-edition `--savepath`.
+
+---
+
 ## 📁 Repository Structure
 
 ```text
@@ -63,8 +89,10 @@ uncle-albert-magical-album-greek/
 │   ├── TECHNICAL_FINDINGS.md          # Complete technical reference & engine fix catalog
 │   └── screenshots/                   # In-engine verification captures
 ├── patches/
-│   └── scummvm-greek-albert.patch     # Full ScummVM mTropolis & Emscripten patch
+│   ├── scummvm-greek-albert.patch     # Full ScummVM mTropolis & Emscripten patch
+│   └── scummvm-french-albert.patch    # French edition support (apply after the Greek patch)
 ├── tools/
+│   ├── make_french_game_data.py       # Builds albert_game_data_fr.zip from the French installer
 │   ├── patch_scummvm_js.py            # Post-build patcher for Emscripten scummvm.js
 │   ├── build-make_http_index.py       # HTTP filesystem index.json generator
 │   └── serve_range.py                 # Local multi-threaded HTTP 206 Range test server

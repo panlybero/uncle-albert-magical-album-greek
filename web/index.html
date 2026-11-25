@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#120d08" />
   <link rel="manifest" href="manifest.json" />
-  <title>Το Μαγικό Άλμπουμ του Θείου Αλβέρτου — Browser Edition</title>
+  <title data-i18n="pageTitle">Το Μαγικό Άλμπουμ του Θείου Αλβέρτου — Browser Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -124,6 +124,17 @@
       gap: 5px;
       transition: all 0.16s ease;
       white-space: nowrap;
+    }
+
+    select.btn {
+      appearance: none;
+      -webkit-appearance: none;
+      font-family: inherit;
+    }
+
+    select.btn option {
+      background: #1a120b;
+      color: var(--parchment);
     }
 
     .btn:hover {
@@ -502,32 +513,36 @@
   <header>
     <div class="brand">
       <div class="brand-badge">📖</div>
-      <div class="brand-title">Το Μαγικό Άλμπουμ του Θείου Αλβέρτου</div>
-      <div class="brand-subtitle">Ελληνική Έκδοση (Emme Interactive / Πήγασος)</div>
+      <div class="brand-title" data-i18n="title">Το Μαγικό Άλμπουμ του Θείου Αλβέρτου</div>
+      <div class="brand-subtitle" data-i18n="subtitle">Ελληνική Έκδοση (Emme Interactive / Πήγασος)</div>
     </div>
     <div class="controls">
-      <button class="btn active" id="mode-toggle-btn" title="Εναλλαγή Trackpad / Άμεσης Αφής">
+      <button class="btn active" id="mode-toggle-btn" data-i18n-title="modeTitle" title="Εναλλαγή Trackpad / Άμεσης Αφής">
         <span id="mode-icon">🖱️</span> <span class="label-text" id="mode-label">Trackpad</span>
       </button>
-      <button class="btn" id="drag-btn-top" title="Κράτημα Κλικ (Σύρσιμο αντικειμένων)">
-        <span>✋</span> <span class="label-text">Σύρσιμο</span>
+      <button class="btn" id="drag-btn-top" data-i18n-title="dragTitle" title="Κράτημα Κλικ (Σύρσιμο αντικειμένων)">
+        <span>✋</span> <span class="label-text" data-i18n="drag">Σύρσιμο</span>
       </button>
-      <button class="btn" id="skip-btn" title="Παράλειψη Εισαγωγής / Βίντεο">
-        <span>⏭</span> <span class="label-text">Παράλειψη</span>
+      <button class="btn" id="skip-btn" data-i18n-title="skipTitle" title="Παράλειψη Εισαγωγής / Βίντεο">
+        <span>⏭</span> <span class="label-text" data-i18n="skip">Παράλειψη</span>
       </button>
-      <button class="btn" id="keyboard-btn" title="Πληκτρολόγιο (Ελληνικά & Λατινικά)">
-        <span>⌨</span> <span class="label-text">Πληκτρολόγιο</span>
+      <button class="btn" id="keyboard-btn" data-i18n-title="keyboardTitle" title="Πληκτρολόγιο (Ελληνικά & Λατινικά)">
+        <span>⌨</span> <span class="label-text" data-i18n="keyboard">Πληκτρολόγιο</span>
       </button>
-      <button class="btn" id="help-btn" title="Οδηγίες Χειρισμού">
-        <span>？</span> <span class="label-text">Βοήθεια</span>
+      <button class="btn" id="help-btn" data-i18n-title="helpTitle" title="Οδηγίες Χειρισμού">
+        <span>？</span> <span class="label-text" data-i18n="help">Βοήθεια</span>
       </button>
-      <button class="btn" id="fullscreen-btn" title="Πλήρης Οθόνη">
-        <span>⛶</span> <span class="label-text">Πλήρης Οθόνη</span>
+      <button class="btn" id="fullscreen-btn" data-i18n-title="fullscreen" title="Πλήρης Οθόνη">
+        <span>⛶</span> <span class="label-text" data-i18n="fullscreen">Πλήρης Οθόνη</span>
       </button>
+      <select class="btn" id="lang-select" title="Γλώσσα / Langue" aria-label="Γλώσσα / Langue">
+        <option value="el">🇬🇷 Ελληνικά</option>
+        <option value="fr">🇫🇷 Français</option>
+      </select>
     </div>
   </header>
 
-  <div id="mobile-kb-bar" role="region" aria-label="Πληκτρολόγιο Εισαγωγής Ονόματος">
+  <div id="mobile-kb-bar" role="region" data-i18n-aria-label="kbBar" aria-label="Πληκτρολόγιο Εισαγωγής Ονόματος">
     <input
       id="mobile-kb-input"
       type="text"
@@ -536,20 +551,21 @@
       autocorrect="off"
       autocapitalize="off"
       spellcheck="false"
+      data-i18n-placeholder="kbPlaceholder"
       placeholder="Πληκτρολογήστε όνομα (Ελληνικά ή Λατινικά)..."
     />
-    <button type="button" class="kb-key-btn" id="kb-bs-btn" title="Διαγραφή (Backspace)">⌫</button>
-    <button type="button" class="kb-key-btn" id="kb-enter-btn" title="Επιβεβαίωση (Enter)">↵ Enter</button>
-    <button type="button" class="kb-key-btn" id="kb-esc-btn" title="Παράλειψη (Escape)">Esc</button>
-    <button type="button" class="kb-key-btn" id="kb-close-btn" title="Κλείσιμο">✕</button>
+    <button type="button" class="kb-key-btn" id="kb-bs-btn" data-i18n-title="kbBackspace" title="Διαγραφή (Backspace)">⌫</button>
+    <button type="button" class="kb-key-btn" id="kb-enter-btn" data-i18n-title="kbEnter" title="Επιβεβαίωση (Enter)">↵ Enter</button>
+    <button type="button" class="kb-key-btn" id="kb-esc-btn" data-i18n-title="kbEscape" title="Παράλειψη (Escape)">Esc</button>
+    <button type="button" class="kb-key-btn" id="kb-close-btn" data-i18n-title="close" title="Κλείσιμο">✕</button>
   </div>
 
   <main id="stage-area">
     <div class="viewport-frame" id="viewport-frame">
       <div id="loading-overlay">
         <div class="crest">🧭</div>
-        <div class="loading-title">Το Μαγικό Άλμπουμ του Θείου Αλβέρτου</div>
-        <div id="status-text">Προετοιμασία μηχανής mTropolis (WebAssembly)...</div>
+        <div class="loading-title" data-i18n="title">Το Μαγικό Άλμπουμ του Θείου Αλβέρτου</div>
+        <div id="status-text" data-i18n="statusInit">Προετοιμασία μηχανής mTropolis (WebAssembly)...</div>
         <div class="progress-track">
           <div id="progress-bar"></div>
         </div>
@@ -566,17 +582,17 @@
     </div>
 
     <div id="touch-dock">
-      <button type="button" class="dock-btn" id="drag-lock-btn" title="Κλείδωμα Κλικ & Σύρσιμο (Drag / Hold)">
+      <button type="button" class="dock-btn" id="drag-lock-btn" data-i18n-title="dragLockTitle" title="Κλείδωμα Κλικ & Σύρσιμο (Drag / Hold)">
         <span>✋</span> <span id="drag-lock-text">Σύρσιμο</span>
       </button>
-      <button type="button" class="dock-btn" id="skip-dock-btn" title="Παράλειψη Βίντεο">
-        <span>⏭</span> <span>Παράλειψη</span>
+      <button type="button" class="dock-btn" id="skip-dock-btn" data-i18n-title="skipVideo" title="Παράλειψη Βίντεο">
+        <span>⏭</span> <span data-i18n="skip">Παράλειψη</span>
       </button>
     </div>
   </main>
 
   <footer>
-    <div class="kbd-hint">
+    <div class="kbd-hint" data-i18n-html="footerHint">
       Χειρισμός: <kbd>🖱️ Σύρσιμο</kbd> Κίνηση δείκτη &bull; <kbd>Tap</kbd> Κλικ &bull; <kbd>Διπλό Tap+Σύρσιμο</kbd> ή <kbd>✋</kbd> Μεταφορά αντικειμένων &bull; <kbd>⌨</kbd> Ελληνικά &amp; Λατινικά
     </div>
     <div>ScummVM mTropolis WebAssembly &bull; 640×480</div>
@@ -584,19 +600,143 @@
 
   <div id="help-modal">
     <div class="modal-card">
-      <h2>Οδηγίες Χειρισμού (Ποντίκι, Trackpad &amp; Πληκτρολόγιο)</h2>
-      <ul>
+      <h2 data-i18n="helpHeading">Οδηγίες Χειρισμού (Ποντίκι, Trackpad &amp; Πληκτρολόγιο)</h2>
+      <ul data-i18n-html="helpList">
         <li><strong>🖱️ Λειτουργία Trackpad (Οθόνες Αφής):</strong> Σύρετε το δάχτυλό σας οπουδήποτε στην οθόνη για να μετακινήσετε σχετικά τον δείκτη (όπως σε laptop trackpad). Έτσι λειτουργούν κανονικά ο φακός, η φωτογραφική μηχανή, ο μεγεθυντικός φακός και οι ενδείξεις (Mouse Over).</li>
         <li><strong>👆 Απλό Κλικ (Tap):</strong> Αγγίξτε στιγμιαία την οθόνη για αριστερό κλικ στη θέση όπου βρίσκεται ο δείκτης.</li>
         <li><strong>✋ Σύρσιμο Αντικειμένων (Drag &amp; Drop):</strong> Πατήστε το κουμπί <strong>✋ Σύρσιμο</strong> (ή κάντε <strong>Διπλό Tap και κρατήστε πατημένο</strong>) για να πιάσετε αντικείμενα και να τα βάλετε/βγάλετε από την τσάντα (satchel).</li>
         <li><strong>⌨ Πληκτρολόγιο (Ελληνικά &amp; Λατινικά):</strong> Για να γράψετε το όνομά σας σε ένα νέο άλμπουμ, κάντε κλικ σε ένα τυλιγμένο άλμπουμ, πληκτρολογήστε με Ελληνικούς ή Λατινικούς χαρακτήρες (ή πατήστε <strong>⌨ Πληκτρολόγιο</strong> σε κινητό/tablet) και πατήστε <strong>Enter ↵</strong>.</li>
         <li><strong>⏭ Παράλειψη Βίντεο:</strong> Κατά τη διάρκεια του βίντεο εισαγωγής, μπορείτε να κάνετε <strong>Tap / Κλικ</strong> οπουδήποτε στην οθόνη ή να πατήσετε <strong>⏭ Παράλειψη</strong> (ή <strong>Esc</strong>) για να μεταβείτε απευθείας στο άλμπουμ.</li>
       </ul>
-      <button class="btn" id="close-help-btn" style="width: 100%; justify-content: center; padding: 9px;">Κλείσιμο</button>
+      <button class="btn" id="close-help-btn" data-i18n="close" style="width: 100%; justify-content: center; padding: 9px;">Κλείσιμο</button>
     </div>
   </div>
 
   <script>
+    // =========================================================================
+    // 0. LANGUAGE / EDITION SELECTION
+    // =========================================================================
+    // Each edition has its own data folder and its own save folder, so player
+    // albums of one language never show up in the other.
+    const GAMES = {
+      el: { path: '/data/albert', language: 'el', savepath: null },
+      fr: { path: '/data/albert_fr', language: 'fr', savepath: '/home/web_user/.local/share/scummvm/saves-fr' }
+    };
+
+    const I18N = {
+      fr: {
+        pageTitle: "L'Album secret de l'oncle Ernest — Édition navigateur",
+        title: "L'Album secret de l'oncle Ernest",
+        subtitle: 'Édition française (Lexis Numérique / Emme)',
+        modeTitle: 'Basculer Trackpad / Toucher direct',
+        trackpad: 'Trackpad',
+        directTouch: 'Toucher direct',
+        drag: 'Glisser',
+        dragHeld: 'Maintenu',
+        dragTitle: 'Maintenir le clic (glisser des objets)',
+        dragLockTitle: 'Verrouiller le clic et glisser (Drag / Hold)',
+        skip: 'Passer',
+        skipTitle: "Passer l'introduction / la vidéo",
+        skipVideo: 'Passer la vidéo',
+        keyboard: 'Clavier',
+        keyboardTitle: 'Clavier (lettres accentuées comprises)',
+        help: 'Aide',
+        helpTitle: 'Commandes',
+        fullscreen: 'Plein écran',
+        kbBar: 'Saisie du nom',
+        kbPlaceholder: 'Tapez votre nom...',
+        kbBackspace: 'Effacer (Retour arrière)',
+        kbEnter: 'Valider (Entrée)',
+        kbEscape: 'Passer (Échap)',
+        close: 'Fermer',
+        statusInit: 'Préparation du moteur mTropolis (WebAssembly)...',
+        ready: 'Prêt !',
+        loadingAssets: 'Chargement des ressources du jeu... ',
+        loadingFiles: 'Chargement des fichiers',
+        starting: "Ouverture de l'album...",
+        footerHint: 'Commandes : <kbd>🖱️ Glisser</kbd> déplacer le pointeur &bull; <kbd>Tap</kbd> clic &bull; <kbd>Double tap + glisser</kbd> ou <kbd>✋</kbd> déplacer un objet &bull; <kbd>⌨</kbd> clavier',
+        helpHeading: 'Commandes (souris, trackpad et clavier)',
+        helpList: '<li><strong>🖱️ Mode Trackpad (écrans tactiles) :</strong> glissez le doigt n\'importe où sur l\'écran pour déplacer le pointeur, comme sur le trackpad d\'un portable. La lampe torche, l\'appareil photo, la loupe et les survols (Mouse Over) fonctionnent ainsi normalement.</li>'
+          + '<li><strong>👆 Clic simple (Tap) :</strong> touchez brièvement l\'écran pour faire un clic gauche à la position du pointeur.</li>'
+          + '<li><strong>✋ Glisser des objets (Drag &amp; Drop) :</strong> appuyez sur <strong>✋ Glisser</strong> (ou faites un <strong>double tap et maintenez</strong>) pour prendre un objet et le mettre dans la sacoche ou l\'en sortir.</li>'
+          + '<li><strong>⌨ Clavier :</strong> pour écrire votre nom sur un nouvel album, cliquez sur un album emballé, tapez votre nom (ou appuyez sur <strong>⌨ Clavier</strong> sur mobile/tablette) puis appuyez sur <strong>Entrée ↵</strong>.</li>'
+          + '<li><strong>⏭ Passer la vidéo :</strong> pendant la vidéo d\'introduction, touchez ou cliquez n\'importe où, ou appuyez sur <strong>⏭ Passer</strong> (ou <strong>Échap</strong>) pour aller directement à l\'album.</li>'
+      },
+      el: {
+        trackpad: 'Trackpad',
+        directTouch: 'Άμεση Αφή',
+        drag: 'Σύρσιμο',
+        dragHeld: 'Κρατημένο',
+        ready: 'Έτοιμο!',
+        loadingAssets: 'Φόρτωση πόρων παιχνιδιού... ',
+        loadingFiles: 'Φόρτωση αρχείων',
+        starting: 'Εκκίνηση άλμπουμ...'
+      }
+    };
+
+    const LANG = (function() {
+      let lang = new URLSearchParams(window.location.search).get('lang');
+      if (!lang) {
+        try { lang = localStorage.getItem('albert-lang'); } catch (e) { lang = null; }
+      }
+      return Object.prototype.hasOwnProperty.call(GAMES, lang) ? lang : 'el';
+    })();
+    const GAME = GAMES[LANG];
+
+    function t(key) {
+      const table = I18N[LANG] || {};
+      return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : I18N.el[key];
+    }
+
+    function applyTranslations() {
+      document.documentElement.lang = LANG;
+      if (LANG === 'el') return; // Greek is the page's default markup
+      const table = I18N[LANG];
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const v = table[el.dataset.i18n];
+        if (v !== undefined) el.textContent = v;
+      });
+      document.querySelectorAll('[data-i18n-html]').forEach(el => {
+        const v = table[el.dataset.i18nHtml];
+        if (v !== undefined) el.innerHTML = v;
+      });
+      [['i18nTitle', 'title'], ['i18nPlaceholder', 'placeholder'], ['i18nAriaLabel', 'aria-label']].forEach(([key, attr]) => {
+        document.querySelectorAll('[data-' + key.replace(/[A-Z]/g, c => '-' + c.toLowerCase()) + ']').forEach(el => {
+          const v = table[el.dataset[key]];
+          if (v !== undefined) el.setAttribute(attr, v);
+        });
+      });
+    }
+    applyTranslations();
+
+    const langSelect = document.getElementById('lang-select');
+    langSelect.value = LANG;
+    langSelect.addEventListener('change', () => {
+      try { localStorage.setItem('albert-lang', langSelect.value); } catch (e) { /* private mode */ }
+      const url = new URL(window.location.href);
+      url.searchParams.set('lang', langSelect.value);
+      url.hash = '';
+      window.location.replace(url.href);
+    });
+
+    // Offer only the editions whose data folder was deployed (see data/index.json).
+    fetch('data/index.json').then(r => r.ok ? r.json() : null).then(index => {
+      if (!index) return;
+      Object.keys(GAMES).forEach(lang => {
+        const folder = GAMES[lang].path.replace(/^\/data\//, '');
+        if (Object.prototype.hasOwnProperty.call(index, folder)) return;
+        const opt = langSelect.querySelector('option[value="' + lang + '"]');
+        if (opt) opt.remove();
+        if (lang === LANG && lang !== 'el') {
+          try { localStorage.removeItem('albert-lang'); } catch (e) { /* private mode */ }
+          const url = new URL(window.location.href);
+          url.searchParams.set('lang', 'el');
+          window.location.replace(url.href);
+        }
+      });
+      if (langSelect.options.length < 2) langSelect.style.display = 'none';
+    }).catch(() => {});
+
     const statusText = document.getElementById('status-text');
     const progressBar = document.getElementById('progress-bar');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -685,7 +825,7 @@
       trackpadCursor.classList.toggle('dragging', isHolding);
       dragBtnTop.classList.toggle('active', state.dragLocked);
       dragLockBtn.classList.toggle('active', state.dragLocked);
-      dragLockText.textContent = state.dragLocked ? 'Κρατημένο' : 'Σύρσιμο';
+      dragLockText.textContent = state.dragLocked ? t('dragHeld') : t('drag');
     }
 
     function dispatchCanvasMouse(type, buttonsMask, buttonCode) {
@@ -721,7 +861,7 @@
       state.trackpadMode = !state.trackpadMode;
       modeToggleBtn.classList.toggle('active', state.trackpadMode);
       modeIcon.textContent = state.trackpadMode ? '🖱️' : '👆';
-      modeLabel.textContent = state.trackpadMode ? 'Trackpad' : 'Άμεση Αφή';
+      modeLabel.textContent = state.trackpadMode ? t('trackpad') : t('directTouch');
       if (!state.trackpadMode) {
         trackpadCursor.classList.remove('visible');
       } else {
@@ -1091,6 +1231,7 @@
     // =========================================================================
     var Module = {
       preRun: [],
+      scummvmEnsureDirs: GAME.savepath ? [GAME.savepath] : [],
       postRun: [function() {
         setTimeout(() => {
           loadingOverlay.classList.add('hidden');
@@ -1106,9 +1247,10 @@
         }
         return [
           '--config=/home/web_user/.config/scummvm/scummvm.ini',
-          '--path=/data/albert',
-          '--language=el',
+          '--path=' + GAME.path,
+          '--language=' + GAME.language,
           '--platform=windows',
+          ...(GAME.savepath ? ['--savepath=' + GAME.savepath] : []),
           ...extra,
           'mtropolis:albert1'
         ];
@@ -1125,7 +1267,7 @@
       canvas: canvas,
       setStatus: function(text) {
         if (!text) {
-          updateProgress('Έτοιμο!', 100);
+          updateProgress(t('ready'), 100);
           setTimeout(() => loadingOverlay.classList.add('hidden'), 350);
           return;
         }
@@ -1134,7 +1276,7 @@
           const cur = parseFloat(m[2]);
           const total = parseFloat(m[4]);
           const pct = total > 0 ? Math.round((cur / total) * 100) : 50;
-          updateProgress('Φόρτωση πόρων παιχνιδιού... ' + pct + '%', pct);
+          updateProgress(t('loadingAssets') + pct + '%', pct);
         } else {
           updateProgress(text, 65);
         }
@@ -1145,9 +1287,9 @@
         if (left) {
           const done = this.totalDependencies - left;
           const pct = Math.round((done / this.totalDependencies) * 100);
-          updateProgress('Φόρτωση αρχείων (' + done + '/' + this.totalDependencies + ')...', pct);
+          updateProgress(t('loadingFiles') + ' (' + done + '/' + this.totalDependencies + ')...', pct);
         } else {
-          updateProgress('Εκκίνηση άλμπουμ...', 95);
+          updateProgress(t('starting'), 95);
         }
       }
     };
